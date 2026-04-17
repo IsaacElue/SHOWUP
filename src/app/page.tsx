@@ -83,6 +83,50 @@ function AppointmentTimeRow({
   );
 }
 
+function statusAccent(status: AppointmentStatus): "emerald" | "rose" | "slate" {
+  if (status === "confirmed") return "emerald";
+  if (status === "cancelled") return "rose";
+  return "slate";
+}
+
+function statusLabel(status: AppointmentStatus) {
+  if (status === "confirmed") return "Confirmed";
+  if (status === "cancelled") return "Cancelled";
+  return "No reply";
+}
+
+function formatAppointmentDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IE", {
+    timeZone: "Europe/Dublin",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDateGroupHeading(dateKey: string) {
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString("en-IE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+const cardToneByStatus: Record<AppointmentStatus, string> = {
+  confirmed: "border-emerald-100 bg-emerald-50/50",
+  cancelled: "border-rose-100 bg-rose-50/50",
+  no_response:
+    "border-slate-200/70 bg-slate-100/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]",
+};
+
+const statusBadgeClass: Record<AppointmentStatus, string> = {
+  confirmed: "bg-emerald-100 text-emerald-900",
+  cancelled: "bg-rose-100 text-rose-900",
+  no_response: "bg-slate-200/80 text-slate-800",
+};
+
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -96,6 +140,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -133,6 +178,15 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [addOpen]);
 
+  useEffect(() => {
+    if (!pendingDeleteId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPendingDeleteId(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingDeleteId]);
+
   async function loadAppointments(userId: string) {
     if (!supabase) return;
 
@@ -141,7 +195,7 @@ export default function Home() {
       .from("appointments")
       .select("id, client_name, client_phone, appointment_at, status")
       .eq("user_id", userId)
-      .order("appointment_at", { ascending: true });
+      .order("appointment_at", { ascending: false });
 
     if (error) {
       setMessage(friendlyGenericMessage());
@@ -240,6 +294,30 @@ export default function Home() {
     setLoading(false);
   }
 
+  async function handleDeleteAppointment(id: string) {
+    if (!supabase || !session) return;
+
+    setLoading(true);
+    setMessage(null);
+
+    const { error } = await supabase
+      .from("appointments")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", session.user.id);
+
+    if (error) {
+      setMessage(friendlyGenericMessage());
+      setLoading(false);
+      setPendingDeleteId(null);
+      return;
+    }
+
+    setPendingDeleteId(null);
+    await loadAppointments(session.user.id);
+    setLoading(false);
+  }
+
   function formatTime(isoDate: string) {
     return new Date(isoDate).toLocaleTimeString("en-IE", {
       timeZone: "Europe/Dublin",
@@ -282,6 +360,30 @@ export default function Home() {
     cancelledToday.length,
     noResponseToday.length,
   ]);
+
+  const appointmentsByDate = useMemo(() => {
+    const map = new Map<string, Appointment[]>();
+    for (const a of appointments) {
+      const key = dublinDateString(a.appointment_at);
+      const list = map.get(key);
+      if (list) list.push(a);
+      else map.set(key, [a]);
+    }
+    const keys = [...map.keys()].sort((a, b) => b.localeCompare(a));
+    for (const k of keys) {
+      const list = map.get(k);
+      if (list) {
+        list.sort(
+          (x, y) =>
+            new Date(x.appointment_at).getTime() - new Date(y.appointment_at).getTime()
+        );
+      }
+    }
+    return keys.map((dateKey) => ({
+      dateKey,
+      items: map.get(dateKey) ?? [],
+    }));
+  }, [appointments]);
 
   if (!supabase) {
     return (
@@ -418,101 +520,92 @@ export default function Home() {
             </div>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              <section className="flex flex-col rounded-2xl border border-emerald-100 bg-white shadow-sm">
-                <div className="rounded-t-2xl bg-emerald-50 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
-                    Confirmed
-                  </p>
-                  <p className="mt-1 text-3xl font-bold text-emerald-700">
-                    {confirmedToday.length}
-                  </p>
-                </div>
-                <div className="flex flex-1 flex-col gap-2 p-3">
-                  {appointmentsLoading ? (
-                    <p className="text-sm text-slate-500">Loading…</p>
-                  ) : confirmedToday.length === 0 ? (
-                    <p className="text-sm text-slate-500">No one here yet.</p>
-                  ) : (
-                    confirmedToday.map((a) => (
-                      <article
-                        key={a.id}
-                        className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3"
-                      >
-                        <p className="font-semibold text-slate-900">{a.client_name}</p>
-                        <p className="text-xs text-slate-600">{a.client_phone}</p>
-                        <AppointmentTimeRow
-                          timeText={formatTime(a.appointment_at)}
-                          accent="emerald"
-                        />
-                      </article>
-                    ))
-                  )}
-                </div>
+              <section className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                  Confirmed
+                </p>
+                <p className="mt-1 text-3xl font-bold text-emerald-700">
+                  {confirmedToday.length}
+                </p>
               </section>
 
-              <section className="flex flex-col rounded-2xl border border-rose-100 bg-white shadow-sm">
-                <div className="rounded-t-2xl bg-rose-50 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">
-                    Cancelled
-                  </p>
-                  <p className="mt-1 text-3xl font-bold text-rose-700">
-                    {cancelledToday.length}
-                  </p>
-                </div>
-                <div className="flex flex-1 flex-col gap-2 p-3">
-                  {appointmentsLoading ? (
-                    <p className="text-sm text-slate-500">Loading…</p>
-                  ) : cancelledToday.length === 0 ? (
-                    <p className="text-sm text-slate-500">No cancellations.</p>
-                  ) : (
-                    cancelledToday.map((a) => (
-                      <article
-                        key={a.id}
-                        className="rounded-xl border border-rose-100 bg-rose-50/50 p-3"
-                      >
-                        <p className="font-semibold text-slate-900">{a.client_name}</p>
-                        <p className="text-xs text-slate-600">{a.client_phone}</p>
-                        <AppointmentTimeRow
-                          timeText={formatTime(a.appointment_at)}
-                          accent="rose"
-                        />
-                      </article>
-                    ))
-                  )}
-                </div>
+              <section className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">
+                  Cancelled
+                </p>
+                <p className="mt-1 text-3xl font-bold text-rose-700">
+                  {cancelledToday.length}
+                </p>
               </section>
 
-              <section className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="rounded-t-2xl bg-slate-100 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    No reply yet
-                  </p>
-                  <p className="mt-1 text-3xl font-bold text-slate-700">
-                    {noResponseToday.length}
-                  </p>
-                </div>
-                <div className="flex flex-1 flex-col gap-2 p-3">
-                  {appointmentsLoading ? (
-                    <p className="text-sm text-slate-500">Loading…</p>
-                  ) : noResponseToday.length === 0 ? (
-                    <p className="text-sm text-slate-500">Everyone has replied.</p>
-                  ) : (
-                    noResponseToday.map((a) => (
-                      <article
-                        key={a.id}
-                        className="rounded-xl border border-slate-200/70 bg-slate-100/70 p-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]"
-                      >
-                        <p className="font-semibold text-slate-900">{a.client_name}</p>
-                        <p className="text-xs text-slate-600">{a.client_phone}</p>
-                        <AppointmentTimeRow
-                          timeText={formatTime(a.appointment_at)}
-                          accent="slate"
-                        />
-                      </article>
-                    ))
-                  )}
-                </div>
+              <section className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  No reply yet
+                </p>
+                <p className="mt-1 text-3xl font-bold text-slate-700">
+                  {noResponseToday.length}
+                </p>
               </section>
+            </div>
+
+            <div className="mt-10">
+              <h2 className="text-lg font-semibold text-slate-900">Appointments</h2>
+              <p className="mt-1 text-sm text-slate-600">Newest days first.</p>
+
+              {appointmentsLoading ? (
+                <p className="mt-4 text-sm text-slate-500">Loading…</p>
+              ) : appointments.length === 0 ? (
+                <p className="mt-4 text-sm text-slate-500">No appointments yet.</p>
+              ) : (
+                <div className="mt-6 space-y-8">
+                  {appointmentsByDate.map(({ dateKey, items }) => (
+                    <div key={dateKey}>
+                      <h3 className="border-b border-slate-200 pb-2 text-base font-semibold text-slate-800">
+                        {formatDateGroupHeading(dateKey)}
+                      </h3>
+                      <ul className="mt-3 space-y-3">
+                        {items.map((a) => {
+                          const accent = statusAccent(a.status);
+                          return (
+                            <li key={a.id}>
+                              <article
+                                className={`rounded-xl border p-3 sm:flex sm:items-start sm:justify-between sm:gap-4 ${cardToneByStatus[a.status]}`}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-slate-900">
+                                    {a.client_name}
+                                  </p>
+                                  <p className="text-xs text-slate-600">{a.client_phone}</p>
+                                  <p className="mt-1 text-sm text-slate-700">
+                                    {formatAppointmentDate(a.appointment_at)}
+                                  </p>
+                                  <AppointmentTimeRow
+                                    timeText={formatTime(a.appointment_at)}
+                                    accent={accent}
+                                  />
+                                  <p
+                                    className={`mt-2 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass[a.status]}`}
+                                  >
+                                    {statusLabel(a.status)}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingDeleteId(a.id)}
+                                  disabled={loading}
+                                  className="mt-3 shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 sm:mt-0"
+                                >
+                                  Delete
+                                </button>
+                              </article>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -609,6 +702,47 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {session && pendingDeleteId ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-900/40"
+            aria-label="Close"
+            onClick={() => setPendingDeleteId(null)}
+          />
+          <div
+            className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-confirm-title"
+          >
+            <p id="delete-confirm-title" className="text-center text-base font-semibold text-slate-900">
+              Are you sure?
+            </p>
+            <p className="mt-2 text-center text-sm text-slate-600">
+              This appointment will be removed for good.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteId(null)}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteAppointment(pendingDeleteId)}
+                disabled={loading}
+                className="rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-60"
+              >
+                {loading ? "Removing…" : "Yes, remove"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
