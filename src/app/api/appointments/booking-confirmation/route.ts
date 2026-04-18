@@ -1,4 +1,5 @@
 import { getUserFromBearerRequest } from "@/lib/auth-server";
+import { getPublicBaseUrl } from "@/lib/public-base-url";
 import { sendBookingConfirmationEmail } from "@/lib/send-reminder-email";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
 
   const { data: row, error: fetchError } = await supabaseAdmin
     .from("appointments")
-    .select("id, user_id, client_name, client_email, appointment_at")
+    .select("id, user_id, client_name, client_email, appointment_at, confirmation_token")
     .eq("id", appointmentId)
     .maybeSingle();
 
@@ -53,8 +54,22 @@ export async function POST(req: Request) {
     return Response.json({ error: "No client email on this appointment" }, { status: 400 });
   }
 
+  let publicBaseUrl: string;
   try {
-    await sendBookingConfirmationEmail(to, row.client_name, row.appointment_at);
+    publicBaseUrl = getPublicBaseUrl();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Missing public URL";
+    return Response.json({ error: msg }, { status: 500 });
+  }
+
+  try {
+    await sendBookingConfirmationEmail(
+      to,
+      row.client_name,
+      row.appointment_at,
+      row.confirmation_token,
+      publicBaseUrl
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Send failed";
     return Response.json({ error: msg }, { status: 500 });

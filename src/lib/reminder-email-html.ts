@@ -127,29 +127,78 @@ export function buildReminderEmailHtml(
 
 export function buildBookingConfirmationEmailPlainText(
   clientName: string,
-  appointmentAtIso: string
+  appointmentAtIso: string,
+  confirmationToken: string,
+  baseUrl: string
 ) {
   const { dateStr, timeStr } = dublinDateAndTime(appointmentAtIso);
+  const base = baseUrl.replace(/\/$/, "");
+  const rescheduleUrl = `${base}/reschedule?token=${encodeURIComponent(confirmationToken)}`;
+  const cancelUrl = `${base}/confirm?token=${encodeURIComponent(confirmationToken)}&response=N`;
   return `Hi ${clientName}, your appointment has been booked for ${dateStr} at ${timeStr}. We'll send you a reminder before your visit.
+
+Reschedule: ${rescheduleUrl}
+Cancel: ${cancelUrl}
 
 Powered by ShowUp`;
 }
 
 export function buildBookingConfirmationEmailHtml(
   clientName: string,
-  appointmentAtIso: string
+  appointmentAtIso: string,
+  confirmationToken: string,
+  baseUrl: string
 ) {
   const { dateStr, timeStr } = dublinDateAndTime(appointmentAtIso);
   const safeName = escapeHtml(clientName);
   const safeDate = escapeHtml(dateStr);
   const safeTime = escapeHtml(timeStr);
+  const base = baseUrl.replace(/\/$/, "");
+  const rescheduleUrl = `${base}/reschedule?token=${encodeURIComponent(confirmationToken)}`;
+  const cancelUrl = `${base}/confirm?token=${encodeURIComponent(confirmationToken)}&response=N`;
   const inner = `
               <p style="margin:0;font-size:16px;line-height:1.55;color:#18181b;">
                 Hi ${safeName}, your appointment has been booked for <strong>${safeDate}</strong> at <strong>${safeTime}</strong>.
               </p>
               <p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#52525b;">
                 We&apos;ll send you a reminder before your visit.
-              </p>`;
+              </p>
+              <p style="margin:24px 0 16px;font-size:15px;line-height:1.5;color:#52525b;">
+                Need to make a change?
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="padding:8px 0;">
+                    <a href="${rescheduleUrl}" style="display:block;text-align:center;background:#059669;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 20px;border-radius:10px;">
+                      Reschedule Appointment
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0 0;">
+                    <a href="${cancelUrl}" style="display:block;text-align:center;background:#f4f4f5;color:#b91c1c;text-decoration:none;font-weight:600;font-size:16px;padding:14px 20px;border-radius:10px;border:1px solid #e4e4e7;">
+                      Cancel Appointment
+                    </a>
+                  </td>
+                </tr>
+              </table>`;
 
   return showUpEmailWrapper("Your appointment is booked", inner);
+}
+
+export function buildOwnerRescheduleNotificationPlainText(clientName: string, newWhenLabel: string) {
+  return `Client has requested a reschedule to ${newWhenLabel}.
+
+Powered by ShowUp`;
+}
+
+export function buildOwnerRescheduleNotificationHtml(clientName: string, newWhenLabel: string) {
+  const safeName = escapeHtml(clientName);
+  const safeWhen = escapeHtml(newWhenLabel);
+  const inner = `
+              <p style="margin:0;font-size:16px;line-height:1.55;color:#18181b;">
+                Client <strong>${safeName}</strong> has requested a reschedule to <strong>${safeWhen}</strong>.
+              </p>`;
+
+  return showUpEmailWrapper("Reschedule request", inner);
 }
