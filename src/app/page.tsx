@@ -10,6 +10,7 @@ type Appointment = {
   id: string;
   client_name: string;
   client_phone: string;
+  client_email: string | null;
   appointment_at: string;
   status: AppointmentStatus;
 };
@@ -133,6 +134,7 @@ export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState(PHONE_PREFIX);
+  const [clientEmail, setClientEmail] = useState("");
   const [appointmentDate, setAppointmentDate] = useState(() => todayDublin());
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -193,7 +195,7 @@ export default function Home() {
     setAppointmentsLoading(true);
     const { data, error } = await supabase
       .from("appointments")
-      .select("id, client_name, client_phone, appointment_at, status")
+      .select("id, client_name, client_phone, client_email, appointment_at, status")
       .eq("user_id", userId)
       .order("appointment_at", { ascending: false });
 
@@ -271,10 +273,12 @@ export default function Home() {
 
     const combined = new Date(`${appointmentDate}T${appointmentTime}:00`);
 
+    const trimmedEmail = clientEmail.trim();
     const { error } = await supabase.from("appointments").insert({
       user_id: session.user.id,
       client_name: clientName.trim(),
       client_phone: clientPhone.trim(),
+      client_email: trimmedEmail === "" ? null : trimmedEmail,
       appointment_at: combined.toISOString(),
     });
 
@@ -286,9 +290,14 @@ export default function Home() {
 
     setClientName("");
     setClientPhone(PHONE_PREFIX);
+    setClientEmail("");
     setAppointmentDate(todayDublin());
     setAppointmentTime("");
-    setMessage("Saved. We’ll remind them by text before the visit.");
+    setMessage(
+      trimmedEmail
+        ? "Saved. We’ll remind them by text and email before the visit."
+        : "Saved. We’ll remind them by text before the visit."
+    );
     setAddOpen(false);
     await loadAppointments(session.user.id);
     setLoading(false);
@@ -576,6 +585,9 @@ export default function Home() {
                                     {a.client_name}
                                   </p>
                                   <p className="text-xs text-slate-600">{a.client_phone}</p>
+                                  {a.client_email ? (
+                                    <p className="text-xs text-slate-600">{a.client_email}</p>
+                                  ) : null}
                                   <p className="mt-1 text-sm text-slate-700">
                                     {formatAppointmentDate(a.appointment_at)}
                                   </p>
@@ -636,7 +648,7 @@ export default function Home() {
                 New appointment
               </h2>
               <p className="text-sm text-slate-500">
-                We’ll text them reminders before the visit.
+                We’ll text them before the visit. Add their email if you want an email reminder too.
               </p>
             </div>
             <form onSubmit={handleAddAppointment} className="space-y-4 px-5 py-4">
@@ -660,6 +672,20 @@ export default function Home() {
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
                   required
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Client email <span className="font-normal text-slate-500">(optional)</span>
+                </span>
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  placeholder="name@example.com"
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
                 />
               </label>

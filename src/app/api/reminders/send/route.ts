@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { reminderMessage } from "@/lib/reminder-copy";
+import { sendReminderEmail } from "@/lib/send-reminder-email";
 
 type ReminderKind = "24h" | "2h";
 
@@ -6,9 +8,12 @@ type AppointmentRow = {
   id: string;
   client_name: string;
   client_phone: string;
+  client_email: string | null;
   appointment_at: string;
   reminder_24h_sent: boolean;
   reminder_2h_sent: boolean;
+  reminder_24h_email_sent: boolean;
+  reminder_2h_email_sent: boolean;
 };
 
 function getReminderKind(appointmentAtIso: string): ReminderKind | null {
@@ -20,15 +25,6 @@ function getReminderKind(appointmentAtIso: string): ReminderKind | null {
   if (minutesUntil >= 115 && minutesUntil <= 125) return "2h";
 
   return null;
-}
-
-function reminderMessage(clientName: string, appointmentAtIso: string) {
-  const when = new Date(appointmentAtIso).toLocaleString("en-IE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-
-  return `Hi ${clientName}, reminder for your appointment on ${when}. Reply Y to confirm or N to cancel.`;
 }
 
 async function sendTwilioSms(to: string, body: string) {
@@ -104,7 +100,7 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("appointments")
     .select(
-      "id, client_name, client_phone, appointment_at, reminder_24h_sent, reminder_2h_sent, status"
+      "id, client_name, client_phone, client_email, appointment_at, reminder_24h_sent, reminder_2h_sent, reminder_24h_email_sent, reminder_2h_email_sent, status"
     )
     .eq("status", "no_response");
 
@@ -115,34 +111,78 @@ export async function POST(req: Request) {
   const appointments = (data ?? []) as (AppointmentRow & { status: string })[];
   let sent24h = 0;
   let sent2h = 0;
+  let emailed24h = 0;
+  let emailed2h = 0;
 
   for (const appt of appointments) {
     const kind = getReminderKind(appt.appointment_at);
     if (!kind) continue;
-    if (kind === "24h" && appt.reminder_24h_sent) continue;
-    if (kind === "2h" && appt.reminder_2h_sent) continue;
 
-    try {
-      await sendTwilioSms(
-        appt.client_phone,
-        reminderMessage(appt.client_name, appt.appointment_at)
-      );
-    } catch {
-      continue;
+    const smsNeeded =
+      (kind === "24h" && !appt.reminder_24h_sent) ||
+      (kind === "2h" && !appt.reminder_2h_sent);
+
+    if (smsNeeded) {
+      try {
+        await sendTwilioSms(
+          appt.client_phone,
+          reminderMessage(appt.client_name, appt.appointment_at)
+        );
+      } catch {
+        continue;
+      }
+
+      const smsUpdate =
+        kind === "24h" ? { reminder_24h_sent: true } : { reminder_2h_sent: true };
+
+      const { error: smsUpdateError } = await supabaseAdmin
+        .from("appointments")
+        .update(smsUpdate)
+        .eq("id", appt.id);
+
+      if (smsUpdateError) continue;
+      if (kind === "24h") sent24h += 1;
+      if (kind === "2h") sent2h += 1;
     }
 
-    const updatePayload =
-      kind === "24h" ? { reminder_24h_sent: true } : { reminder_2h_sent: true };
+    const clientEmail = appt.client_email?.trim();
+    const emailNeeded =
+      Boolean(clientEmail) &&
+      ((kind === "24h" && !appt.reminder_24h_email_sent) ||
+        (kind === "2h" && !appt.reminder_2h_email_sent));
 
-    const { error: updateError } = await supabaseAdmin
-      .from("appointments")
-      .update(updatePayload)
-      .eq("id", appt.id);
+    if (emailNeeded && clientEmail) {
+      try {
+        await sendReminderEmail(
+          clientEmail,
+          appt.client_name,
+          appt.appointment_at
+        );
+      } catch {
+        continue;
+      }
 
-    if (updateError) continue;
-    if (kind === "24h") sent24h += 1;
-    if (kind === "2h") sent2h += 1;
+      const emailUpdate =
+        kind === "24h"
+          ? { reminder_24h_email_sent: true }
+          : { reminder_2h_email_sent: true };
+
+      const { error: emailUpdateError } = await supabaseAdmin
+        .from("appointments")
+        .update(emailUpdate)
+        .eq("id", appt.id);
+
+      if (emailUpdateError) continue;
+      if (kind === "24h") emailed24h += 1;
+      if (kind === "2h") emailed2h += 1;
+    }
   }
 
-  return Response.json({ ok: true, sent24h, sent2h });
+  return Response.json({
+    ok: true,
+    sent24h,
+    sent2h,
+    emailed24h,
+    emailed2h,
+  });
 }
