@@ -1,15 +1,11 @@
-/** Shared copy for SMS and email reminders (same core message). */
+/** SMS reminder copy only — uses Europe/Dublin for the appointment time. */
 
 export function reminderMessage(clientName: string, appointmentAtIso: string) {
   const when = new Date(appointmentAtIso).toLocaleString("en-IE", {
+    timeZone: "Europe/Dublin",
     dateStyle: "medium",
     timeStyle: "short",
   });
 
   return `Hi ${clientName}, reminder for your appointment on ${when}. Reply Y to confirm or N to cancel.`;
-}
-
-export function reminderEmailBody(clientName: string, appointmentAtIso: string) {
-  const core = reminderMessage(clientName, appointmentAtIso);
-  return `${core}\n\nPlease reply Y or N by text message to the number we text you from — replies to this email are not read yet.`;
 }

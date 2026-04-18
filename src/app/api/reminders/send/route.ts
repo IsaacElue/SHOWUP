@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getPublicBaseUrl } from "@/lib/public-base-url";
 import { reminderMessage } from "@/lib/reminder-copy";
 import { sendReminderEmail } from "@/lib/send-reminder-email";
 
@@ -9,6 +10,7 @@ type AppointmentRow = {
   client_name: string;
   client_phone: string;
   client_email: string | null;
+  confirmation_token: string;
   appointment_at: string;
   reminder_24h_sent: boolean;
   reminder_2h_sent: boolean;
@@ -100,7 +102,7 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("appointments")
     .select(
-      "id, client_name, client_phone, client_email, appointment_at, reminder_24h_sent, reminder_2h_sent, reminder_24h_email_sent, reminder_2h_email_sent, status"
+      "id, client_name, client_phone, client_email, confirmation_token, appointment_at, reminder_24h_sent, reminder_2h_sent, reminder_24h_email_sent, reminder_2h_email_sent, status"
     )
     .eq("status", "no_response");
 
@@ -163,10 +165,13 @@ export async function POST(req: Request) {
 
     if (emailNeeded && clientEmail) {
       try {
+        const publicBaseUrl = getPublicBaseUrl();
         await sendReminderEmail(
           clientEmail,
           appt.client_name,
-          appt.appointment_at
+          appt.appointment_at,
+          appt.confirmation_token,
+          publicBaseUrl
         );
 
         const emailUpdate =

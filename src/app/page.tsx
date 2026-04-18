@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { DateTime } from "luxon";
+import { appointmentAtDublinToUtcIso } from "@/lib/dublin-appointment";
 import { supabase } from "@/lib/supabase";
 
 type AppointmentStatus = "confirmed" | "cancelled" | "no_response";
@@ -107,12 +109,10 @@ function formatAppointmentDate(iso: string) {
 }
 
 function formatDateGroupHeading(dateKey: string) {
-  return new Date(`${dateKey}T12:00:00`).toLocaleDateString("en-IE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return DateTime.fromISO(dateKey, { zone: "Europe/Dublin" }).toLocaleString(
+    DateTime.DATE_FULL,
+    { locale: "en-IE" }
+  );
 }
 
 const cardToneByStatus: Record<AppointmentStatus, string> = {
@@ -271,7 +271,14 @@ export default function Home() {
     setLoading(true);
     setMessage(null);
 
-    const combined = new Date(`${appointmentDate}T${appointmentTime}:00`);
+    let appointmentAtIso: string;
+    try {
+      appointmentAtIso = appointmentAtDublinToUtcIso(appointmentDate, appointmentTime);
+    } catch {
+      setMessage("That date or time doesn’t look right. Please try again.");
+      setLoading(false);
+      return;
+    }
 
     const trimmedEmail = clientEmail.trim();
     const { error } = await supabase.from("appointments").insert({
@@ -279,7 +286,8 @@ export default function Home() {
       client_name: clientName.trim(),
       client_phone: clientPhone.trim(),
       client_email: trimmedEmail === "" ? null : trimmedEmail,
-      appointment_at: combined.toISOString(),
+      confirmation_token: crypto.randomUUID(),
+      appointment_at: appointmentAtIso,
     });
 
     if (error) {

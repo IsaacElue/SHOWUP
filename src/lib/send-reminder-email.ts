@@ -1,10 +1,15 @@
 import { Resend } from "resend";
-import { reminderEmailBody } from "@/lib/reminder-copy";
+import {
+  buildReminderEmailHtml,
+  buildReminderEmailPlainText,
+} from "@/lib/reminder-email-html";
 
 export async function sendReminderEmail(
   to: string,
   clientName: string,
-  appointmentAtIso: string
+  appointmentAtIso: string,
+  confirmationToken: string,
+  baseUrl: string
 ) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
@@ -12,12 +17,25 @@ export async function sendReminderEmail(
     throw new Error("Missing RESEND_API_KEY or RESEND_FROM_EMAIL");
   }
 
+  const html = buildReminderEmailHtml(
+    clientName,
+    appointmentAtIso,
+    confirmationToken,
+    baseUrl
+  );
+  const text = buildReminderEmailPlainText(
+    clientName,
+    appointmentAtIso,
+    confirmationToken,
+    baseUrl
+  );
+
   const resend = new Resend(apiKey);
-  const text = reminderEmailBody(clientName, appointmentAtIso);
   const { error } = await resend.emails.send({
     from,
     to,
     subject: `Appointment reminder — ${clientName}`,
+    html,
     text,
   });
 
