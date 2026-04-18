@@ -113,6 +113,7 @@ export async function POST(req: Request) {
   let sent2h = 0;
   let emailed24h = 0;
   let emailed2h = 0;
+  const emailErrors: { appointmentId: string; message: string }[] = [];
 
   for (const appt of appointments) {
     const kind = getReminderKind(appt.appointment_at);
@@ -128,21 +129,30 @@ export async function POST(req: Request) {
           appt.client_phone,
           reminderMessage(appt.client_name, appt.appointment_at)
         );
-      } catch {
-        continue;
+
+        const smsUpdate =
+          kind === "24h" ? { reminder_24h_sent: true } : { reminder_2h_sent: true };
+
+        const { error: smsUpdateError } = await supabaseAdmin
+          .from("appointments")
+          .update(smsUpdate)
+          .eq("id", appt.id);
+
+        if (smsUpdateError) {
+          console.error(
+            "[reminders/send] SMS sent but DB update failed",
+            appt.id,
+            smsUpdateError.message
+          );
+        } else {
+          if (kind === "24h") sent24h += 1;
+          if (kind === "2h") sent2h += 1;
+        }
+      } catch (smsErr) {
+        const smsMsg =
+          smsErr instanceof Error ? smsErr.message : String(smsErr);
+        console.error("[reminders/send] SMS failed", appt.id, smsMsg);
       }
-
-      const smsUpdate =
-        kind === "24h" ? { reminder_24h_sent: true } : { reminder_2h_sent: true };
-
-      const { error: smsUpdateError } = await supabaseAdmin
-        .from("appointments")
-        .update(smsUpdate)
-        .eq("id", appt.id);
-
-      if (smsUpdateError) continue;
-      if (kind === "24h") sent24h += 1;
-      if (kind === "2h") sent2h += 1;
     }
 
     const clientEmail = appt.client_email?.trim();
@@ -158,23 +168,31 @@ export async function POST(req: Request) {
           appt.client_name,
           appt.appointment_at
         );
-      } catch {
-        continue;
+
+        const emailUpdate =
+          kind === "24h"
+            ? { reminder_24h_email_sent: true }
+            : { reminder_2h_email_sent: true };
+
+        const { error: emailUpdateError } = await supabaseAdmin
+          .from("appointments")
+          .update(emailUpdate)
+          .eq("id", appt.id);
+
+        if (emailUpdateError) {
+          const msg = `DB update after email: ${emailUpdateError.message}`;
+          console.error("[reminders/send] email sent but DB update failed", appt.id, msg);
+          emailErrors.push({ appointmentId: appt.id, message: msg });
+        } else {
+          if (kind === "24h") emailed24h += 1;
+          if (kind === "2h") emailed2h += 1;
+        }
+      } catch (emailErr) {
+        const emailMsg =
+          emailErr instanceof Error ? emailErr.message : String(emailErr);
+        console.error("[reminders/send] email failed", appt.id, emailMsg);
+        emailErrors.push({ appointmentId: appt.id, message: emailMsg });
       }
-
-      const emailUpdate =
-        kind === "24h"
-          ? { reminder_24h_email_sent: true }
-          : { reminder_2h_email_sent: true };
-
-      const { error: emailUpdateError } = await supabaseAdmin
-        .from("appointments")
-        .update(emailUpdate)
-        .eq("id", appt.id);
-
-      if (emailUpdateError) continue;
-      if (kind === "24h") emailed24h += 1;
-      if (kind === "2h") emailed2h += 1;
     }
   }
 
@@ -184,5 +202,6 @@ export async function POST(req: Request) {
     sent2h,
     emailed24h,
     emailed2h,
+    emailErrors,
   });
 }
