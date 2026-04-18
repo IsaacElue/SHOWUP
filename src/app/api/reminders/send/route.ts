@@ -23,8 +23,9 @@ function getReminderKind(appointmentAtIso: string): ReminderKind | null {
   const nowTime = Date.now();
   const minutesUntil = (appointmentTime - nowTime) / (1000 * 60);
 
-  if (minutesUntil >= 23 * 60 + 55 && minutesUntil <= 24 * 60 + 5) return "24h";
-  if (minutesUntil >= 115 && minutesUntil <= 125) return "2h";
+  // 24h window: 23h–25h before; 2h window: 1h30m–2h30m before
+  if (minutesUntil >= 23 * 60 && minutesUntil <= 25 * 60) return "24h";
+  if (minutesUntil >= 90 && minutesUntil <= 150) return "2h";
 
   return null;
 }

@@ -1,0 +1,64 @@
+import { getUserFromBearerRequest } from "@/lib/auth-server";
+import { sendBookingConfirmationEmail } from "@/lib/send-reminder-email";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+
+export async function POST(req: Request) {
+  const { user, error: authError } = await getUserFromBearerRequest(req);
+  if (!user) {
+    return Response.json(
+      { error: authError === "Server not configured" ? authError : "Unauthorized" },
+      { status: authError === "Server not configured" ? 500 : 401 }
+    );
+  }
+
+  if (!supabaseAdmin) {
+    return Response.json({ error: "Server not configured" }, { status: 500 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const appointmentId =
+    typeof body === "object" &&
+    body !== null &&
+    "appointmentId" in body &&
+    typeof (body as { appointmentId: unknown }).appointmentId === "string"
+      ? (body as { appointmentId: string }).appointmentId.trim()
+      : "";
+
+  if (!appointmentId) {
+    return Response.json({ error: "Missing appointmentId" }, { status: 400 });
+  }
+
+  const { data: row, error: fetchError } = await supabaseAdmin
+    .from("appointments")
+    .select("id, user_id, client_name, client_email, appointment_at")
+    .eq("id", appointmentId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return Response.json({ error: fetchError.message }, { status: 500 });
+  }
+
+  if (!row || row.user_id !== user.id) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const to = row.client_email?.trim();
+  if (!to) {
+    return Response.json({ error: "No client email on this appointment" }, { status: 400 });
+  }
+
+  try {
+    await sendBookingConfirmationEmail(to, row.client_name, row.appointment_at);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Send failed";
+    return Response.json({ error: msg }, { status: 500 });
+  }
+
+  return Response.json({ ok: true });
+}

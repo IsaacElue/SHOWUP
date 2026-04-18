@@ -143,6 +143,12 @@ export default function Home() {
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [reminderSendingId, setReminderSendingId] = useState<string | null>(null);
+  const [reminderNote, setReminderNote] = useState<{
+    id: string;
+    text: string;
+    ok: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -281,19 +287,42 @@ export default function Home() {
     }
 
     const trimmedEmail = clientEmail.trim();
-    const { error } = await supabase.from("appointments").insert({
-      user_id: session.user.id,
-      client_name: clientName.trim(),
-      client_phone: clientPhone.trim(),
-      client_email: trimmedEmail === "" ? null : trimmedEmail,
-      confirmation_token: crypto.randomUUID(),
-      appointment_at: appointmentAtIso,
-    });
+    const { data: inserted, error } = await supabase
+      .from("appointments")
+      .insert({
+        user_id: session.user.id,
+        client_name: clientName.trim(),
+        client_phone: clientPhone.trim(),
+        client_email: trimmedEmail === "" ? null : trimmedEmail,
+        confirmation_token: crypto.randomUUID(),
+        appointment_at: appointmentAtIso,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       setMessage(friendlyGenericMessage());
       setLoading(false);
       return;
+    }
+
+    if (trimmedEmail && inserted?.id) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        try {
+          await fetch("/api/appointments/booking-confirmation", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ appointmentId: inserted.id }),
+          });
+        } catch {
+          // Booking email is best-effort; appointment is already saved.
+        }
+      }
     }
 
     setClientName("");
@@ -309,6 +338,58 @@ export default function Home() {
     setAddOpen(false);
     await loadAppointments(session.user.id);
     setLoading(false);
+  }
+
+  async function sendReminderNow(appointmentId: string) {
+    if (!supabase || !session) return;
+
+    setReminderSendingId(appointmentId);
+    setReminderNote(null);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      setReminderNote({
+        id: appointmentId,
+        text: "Session expired. Sign in again.",
+        ok: false,
+      });
+      setReminderSendingId(null);
+      return;
+    }
+
+    let res: Response;
+    try {
+      res = await fetch("/api/reminders/send-one", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ appointmentId }),
+      });
+    } catch {
+      setReminderNote({
+        id: appointmentId,
+        text: "Couldn't send reminder",
+        ok: false,
+      });
+      setReminderSendingId(null);
+      return;
+    }
+
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    setReminderSendingId(null);
+
+    if (res.ok) {
+      setReminderNote({ id: appointmentId, text: "Reminder sent", ok: true });
+    } else {
+      setReminderNote({
+        id: appointmentId,
+        text: json.error ?? "Couldn't send reminder",
+        ok: false,
+      });
+    }
   }
 
   async function handleDeleteAppointment(id: string) {
@@ -599,14 +680,41 @@ export default function Home() {
                                     {statusLabel(a.status)}
                                   </p>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setPendingDeleteId(a.id)}
-                                  disabled={loading}
-                                  className="mt-3 shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 sm:mt-0"
-                                >
-                                  Delete
-                                </button>
+                                <div className="mt-3 flex shrink-0 flex-col items-stretch gap-2 sm:mt-0 sm:items-end">
+                                  {a.status === "no_response" && a.client_email ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => void sendReminderNow(a.id)}
+                                        disabled={loading || reminderSendingId === a.id}
+                                        className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-medium text-emerald-800 shadow-sm transition hover:bg-emerald-50 disabled:opacity-50"
+                                      >
+                                        {reminderSendingId === a.id
+                                          ? "Sending…"
+                                          : "Send reminder now"}
+                                      </button>
+                                      {reminderNote?.id === a.id ? (
+                                        <p
+                                          className={`text-right text-xs font-medium ${
+                                            reminderNote.ok
+                                              ? "text-emerald-700"
+                                              : "text-rose-700"
+                                          }`}
+                                        >
+                                          {reminderNote.text}
+                                        </p>
+                                      ) : null}
+                                    </>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() => setPendingDeleteId(a.id)}
+                                    disabled={loading}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-50"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </article>
                             </li>
                           );
