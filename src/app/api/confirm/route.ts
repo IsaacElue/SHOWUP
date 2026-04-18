@@ -1,4 +1,18 @@
+/**
+ * POST only — this is the only place appointment status is updated for email links.
+ * GET is not supported (returns 405) so prefetchers cannot mutate via this route.
+ */
 import { supabaseAdmin } from "@/lib/supabase-admin";
+
+export function GET() {
+  return Response.json(
+    {
+      error:
+        "This endpoint only accepts POST. Open your confirmation link in a browser and use the button.",
+    },
+    { status: 405 }
+  );
+}
 
 export async function POST(req: Request) {
   let body: unknown;

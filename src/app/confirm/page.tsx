@@ -1,3 +1,8 @@
+/**
+ * GET /confirm — read-only. Loads appointment details for display only.
+ * Never insert/update/delete here; email prefetchers may hit this URL.
+ * Status changes happen only via POST /api/confirm (user button click).
+ */
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ConfirmAppointmentActions } from "./confirm-client";
 
