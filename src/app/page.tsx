@@ -343,40 +343,30 @@ export default function Home() {
     });
   }
 
-  const todays = useMemo(() => {
-    const day = todayDublin();
-    return appointments.filter((a) => dublinDateString(a.appointment_at) === day);
+  const allTimeStats = useMemo(() => {
+    let confirmed = 0;
+    let cancelled = 0;
+    let awaiting = 0;
+    for (const a of appointments) {
+      if (a.status === "confirmed") confirmed += 1;
+      else if (a.status === "cancelled") cancelled += 1;
+      else awaiting += 1;
+    }
+    return {
+      total: appointments.length,
+      confirmed,
+      cancelled,
+      awaiting,
+    };
   }, [appointments]);
 
-  const confirmedToday = useMemo(
-    () => todays.filter((a) => a.status === "confirmed"),
-    [todays]
-  );
-  const cancelledToday = useMemo(
-    () => todays.filter((a) => a.status === "cancelled"),
-    [todays]
-  );
-  const noResponseToday = useMemo(
-    () => todays.filter((a) => a.status === "no_response"),
-    [todays]
-  );
-
-  const todaySummary = useMemo(() => {
-    if (appointmentsLoading) return "Loading your day…";
-    const total = todays.length;
-    if (total === 0) return "No appointments today.";
-    const c = confirmedToday.length;
-    const x = cancelledToday.length;
-    const w = noResponseToday.length;
+  const statsSummary = useMemo(() => {
+    if (appointmentsLoading) return "Loading…";
+    const { total, confirmed, cancelled, awaiting } = allTimeStats;
+    if (total === 0) return "No appointments yet.";
     const apptWord = total === 1 ? "appointment" : "appointments";
-    return `${total} ${apptWord} today — ${c} confirmed, ${x} cancelled, ${w} awaiting reply`;
-  }, [
-    appointmentsLoading,
-    todays.length,
-    confirmedToday.length,
-    cancelledToday.length,
-    noResponseToday.length,
-  ]);
+    return `${total} ${apptWord} in total — ${confirmed} confirmed, ${cancelled} cancelled, ${awaiting} awaiting reply`;
+  }, [appointmentsLoading, allTimeStats]);
 
   const appointmentsByDate = useMemo(() => {
     const map = new Map<string, Appointment[]>();
@@ -521,7 +511,7 @@ export default function Home() {
                     timeZone: "Europe/Dublin",
                   })}
                 </p>
-                <p className="mt-2 text-sm font-medium text-slate-700">{todaySummary}</p>
+                <p className="mt-2 text-sm font-medium text-slate-700">{statsSummary}</p>
               </div>
               <button
                 type="button"
@@ -541,27 +531,27 @@ export default function Home() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
                   Confirmed
                 </p>
-                <p className="mt-1 text-3xl font-bold text-emerald-700">
-                  {confirmedToday.length}
-                </p>
+                  <p className="mt-1 text-3xl font-bold text-emerald-700">
+                    {allTimeStats.confirmed}
+                  </p>
               </section>
 
               <section className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">
                   Cancelled
                 </p>
-                <p className="mt-1 text-3xl font-bold text-rose-700">
-                  {cancelledToday.length}
-                </p>
+                  <p className="mt-1 text-3xl font-bold text-rose-700">
+                    {allTimeStats.cancelled}
+                  </p>
               </section>
 
               <section className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                   No reply yet
                 </p>
-                <p className="mt-1 text-3xl font-bold text-slate-700">
-                  {noResponseToday.length}
-                </p>
+                  <p className="mt-1 text-3xl font-bold text-slate-700">
+                    {allTimeStats.awaiting}
+                  </p>
               </section>
             </div>
 
