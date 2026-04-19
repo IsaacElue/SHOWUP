@@ -1,4 +1,5 @@
 import { appointmentAtDublinToUtcIso } from "@/lib/dublin-appointment";
+import { getPublicBaseUrl } from "@/lib/public-base-url";
 import { sendOwnerRescheduleNotificationEmail } from "@/lib/send-reminder-email";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -78,9 +79,25 @@ export async function POST(req: Request) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
+  let publicBaseUrl: string;
+  try {
+    publicBaseUrl = getPublicBaseUrl();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Missing public URL";
+    return Response.json({ error: msg }, { status: 500 });
+  }
+
+  const ownerToken = crypto.randomUUID();
+  const base = publicBaseUrl.replace(/\/$/, "");
+  const acceptUrl = `${base}/api/reschedule/accept?token=${encodeURIComponent(ownerToken)}`;
+  const declineUrl = `${base}/api/reschedule/decline?token=${encodeURIComponent(ownerToken)}`;
+
   const { error: updateError } = await supabaseAdmin
     .from("appointments")
-    .update({ appointment_at: newIso })
+    .update({
+      reschedule_pending_at: newIso,
+      reschedule_owner_token: ownerToken,
+    })
     .eq("id", row.id)
     .eq("confirmation_token", token);
 
@@ -100,7 +117,13 @@ export async function POST(req: Request) {
     } else {
       const ownerEmail = ownerData.user?.email?.trim();
       if (ownerEmail) {
-        await sendOwnerRescheduleNotificationEmail(ownerEmail, row.client_name, newWhenLabel);
+        await sendOwnerRescheduleNotificationEmail(
+          ownerEmail,
+          row.client_name,
+          newWhenLabel,
+          acceptUrl,
+          declineUrl
+        );
         ownerNotified = true;
       }
     }
@@ -109,5 +132,5 @@ export async function POST(req: Request) {
     console.error("[reschedule] owner notify failed", row.id, msg);
   }
 
-  return Response.json({ ok: true, ownerNotified, appointmentAt: newIso });
+  return Response.json({ ok: true, ownerNotified, pendingAt: newIso });
 }

@@ -4,6 +4,8 @@ import {
   buildBookingConfirmationEmailPlainText,
   buildOwnerRescheduleNotificationHtml,
   buildOwnerRescheduleNotificationPlainText,
+  buildRescheduleDeclinedClientHtml,
+  buildRescheduleDeclinedClientPlainText,
   buildReminderEmailHtml,
   buildReminderEmailPlainText,
 } from "@/lib/reminder-email-html";
@@ -93,7 +95,9 @@ export async function sendBookingConfirmationEmail(
 export async function sendOwnerRescheduleNotificationEmail(
   to: string,
   clientName: string,
-  newWhenLabel: string
+  newWhenLabel: string,
+  acceptUrl: string,
+  declineUrl: string
 ) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
@@ -101,14 +105,48 @@ export async function sendOwnerRescheduleNotificationEmail(
     throw new Error("Missing RESEND_API_KEY or RESEND_FROM_EMAIL");
   }
 
-  const html = buildOwnerRescheduleNotificationHtml(clientName, newWhenLabel);
-  const text = buildOwnerRescheduleNotificationPlainText(clientName, newWhenLabel);
+  const html = buildOwnerRescheduleNotificationHtml(
+    clientName,
+    newWhenLabel,
+    acceptUrl,
+    declineUrl
+  );
+  const text = buildOwnerRescheduleNotificationPlainText(
+    clientName,
+    newWhenLabel,
+    acceptUrl,
+    declineUrl
+  );
 
   const resend = new Resend(apiKey);
   const { error } = await resend.emails.send({
     from,
     to,
     subject: `Reschedule request — ${clientName}`,
+    html,
+    text,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function sendRescheduleDeclinedClientEmail(to: string, clientName: string) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL ?? DEFAULT_BOOKING_FROM;
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY");
+  }
+
+  const html = buildRescheduleDeclinedClientHtml(clientName);
+  const text = buildRescheduleDeclinedClientPlainText(clientName);
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from,
+    to,
+    subject: "Your appointment — ShowUp",
     html,
     text,
   });

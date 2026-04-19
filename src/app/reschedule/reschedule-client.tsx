@@ -68,8 +68,8 @@ export function RescheduleForm({
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-8 text-center shadow-sm">
         <p className="text-lg font-semibold text-emerald-900">
           {ownerNotified
-            ? "Thanks! Your new time is saved and the clinic has been notified."
-            : "Thanks! Your new time is saved."}
+            ? "Thanks! Your clinic has been asked to approve your new time. You’ll get an email when they respond."
+            : "Thanks! Your request was saved. Contact the clinic if you don’t hear back."}
         </p>
       </div>
     );

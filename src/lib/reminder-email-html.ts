@@ -1,4 +1,4 @@
-function escapeHtml(text: string) {
+export function escapeHtml(text: string) {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -186,19 +186,72 @@ export function buildBookingConfirmationEmailHtml(
   return showUpEmailWrapper("Your appointment is booked", inner);
 }
 
-export function buildOwnerRescheduleNotificationPlainText(clientName: string, newWhenLabel: string) {
+export function buildOwnerRescheduleNotificationPlainText(
+  clientName: string,
+  newWhenLabel: string,
+  acceptUrl: string,
+  declineUrl: string
+) {
   return `Client has requested a reschedule to ${newWhenLabel}.
+
+Accept: ${acceptUrl}
+Decline: ${declineUrl}
 
 Powered by ShowUp`;
 }
 
-export function buildOwnerRescheduleNotificationHtml(clientName: string, newWhenLabel: string) {
+export function buildOwnerRescheduleNotificationHtml(
+  clientName: string,
+  newWhenLabel: string,
+  acceptUrl: string,
+  declineUrl: string
+) {
   const safeName = escapeHtml(clientName);
   const safeWhen = escapeHtml(newWhenLabel);
   const inner = `
               <p style="margin:0;font-size:16px;line-height:1.55;color:#18181b;">
                 Client <strong>${safeName}</strong> has requested a reschedule to <strong>${safeWhen}</strong>.
-              </p>`;
+              </p>
+              <p style="margin:20px 0 16px;font-size:15px;line-height:1.5;color:#52525b;">
+                Choose an action:
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="padding:8px 0;">
+                    <a href="${acceptUrl}" style="display:block;text-align:center;background:#059669;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 20px;border-radius:10px;">
+                      Accept Reschedule
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0 0;">
+                    <a href="${declineUrl}" style="display:block;text-align:center;background:#f4f4f5;color:#b91c1c;text-decoration:none;font-weight:600;font-size:16px;padding:14px 20px;border-radius:10px;border:1px solid #e4e4e7;">
+                      Decline Reschedule
+                    </a>
+                  </td>
+                </tr>
+              </table>`;
 
   return showUpEmailWrapper("Reschedule request", inner);
+}
+
+export function buildRescheduleDeclinedClientPlainText(clientName: string) {
+  return `Hi ${clientName},
+
+Your reschedule request could not be accommodated. Your original appointment stands.
+
+Powered by ShowUp`;
+}
+
+export function buildRescheduleDeclinedClientHtml(clientName: string) {
+  const safeName = escapeHtml(clientName);
+  const inner = `
+              <p style="margin:0;font-size:16px;line-height:1.55;color:#18181b;">
+                Hi ${safeName},
+              </p>
+              <p style="margin:16px 0 0;font-size:16px;line-height:1.55;color:#18181b;">
+                Your reschedule request could not be accommodated. Your original appointment stands.
+              </p>`;
+
+  return showUpEmailWrapper("Appointment update", inner);
 }
