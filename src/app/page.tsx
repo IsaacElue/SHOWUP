@@ -125,7 +125,7 @@ const cardToneByStatus: Record<AppointmentStatus, string> = {
 const statusBadgeClass: Record<AppointmentStatus, string> = {
   confirmed: "bg-emerald-100 text-emerald-900",
   cancelled: "bg-rose-100 text-rose-900",
-  no_response: "bg-slate-200/80 text-slate-800",
+  no_response: "border border-amber-200/90 bg-amber-100 text-amber-900",
 };
 
 export default function Home() {
@@ -483,8 +483,16 @@ export default function Home() {
     );
   }
 
+  const shellClassName = session
+    ? "min-h-screen bg-gradient-to-b from-emerald-50/40 via-slate-50 to-slate-100 pb-10"
+    : "flex min-h-screen flex-col bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 pb-10 [background-image:radial-gradient(ellipse_120%_80%_at_50%_-30%,rgba(16,185,129,0.14),transparent_55%),radial-gradient(circle_at_100%_0%,rgba(148,163,184,0.12)_0%,transparent_42%),radial-gradient(circle_at_0%_100%,rgba(16,185,129,0.06)_0%,transparent_45%)]";
+
+  const mainClassName = session
+    ? "mx-auto max-w-5xl px-4 pt-6 sm:px-6 sm:pt-8"
+    : "mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-4 py-12 sm:px-6 sm:py-16";
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 via-slate-50 to-slate-100 pb-10">
+    <div className={shellClassName}>
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
@@ -511,7 +519,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 pt-6 sm:px-6 sm:pt-8">
+      <main className={mainClassName}>
         {!session ? (
           <div className="mx-auto max-w-md space-y-6">
             <div className="text-center">
@@ -687,7 +695,7 @@ export default function Home() {
                                         type="button"
                                         onClick={() => void sendReminderNow(a.id)}
                                         disabled={loading || reminderSendingId === a.id}
-                                        className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-medium text-emerald-800 shadow-sm transition hover:bg-emerald-50 disabled:opacity-50"
+                                        className="inline-flex h-9 w-full min-w-[10.5rem] items-center justify-center rounded-lg border border-emerald-500/55 bg-white px-3 text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-50 sm:w-auto"
                                       >
                                         {reminderSendingId === a.id
                                           ? "Sending…"
@@ -710,7 +718,7 @@ export default function Home() {
                                     type="button"
                                     onClick={() => setPendingDeleteId(a.id)}
                                     disabled={loading}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-50"
+                                    className="inline-flex h-9 w-full min-w-[10.5rem] items-center justify-center rounded-lg border border-rose-500/55 bg-white px-3 text-sm font-medium text-rose-800 transition hover:bg-rose-50 disabled:opacity-50 sm:w-auto"
                                   >
                                     Delete
                                   </button>
