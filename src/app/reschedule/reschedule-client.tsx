@@ -68,8 +68,8 @@ export function RescheduleForm({
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-8 text-center shadow-sm">
         <p className="text-lg font-semibold text-emerald-900">
           {ownerNotified
-            ? "Thanks! Your clinic has been asked to approve your new time. You’ll get an email when they respond."
-            : "Thanks! Your request was saved. Contact the clinic if you don’t hear back."}
+            ? "Thanks! The business has been asked to approve your new time. You’ll get an email when they respond."
+            : "Thanks! Your request was saved. Reach out to them if you don’t hear back."}
         </p>
       </div>
     );
@@ -79,7 +79,7 @@ export function RescheduleForm({
     <form onSubmit={(e) => void submit(e)} className="space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-center text-sm font-medium uppercase tracking-wide text-slate-500">
-          Reschedule visit
+          Reschedule appointment
         </p>
         <p className="mt-3 text-center text-xl font-semibold text-slate-900">{clientName}</p>
         <p className="mt-6 text-sm font-medium text-slate-700">Pick a new date and time</p>

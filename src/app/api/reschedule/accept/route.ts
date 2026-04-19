@@ -92,7 +92,7 @@ export async function GET(req: Request) {
 
   const subtext = clientNotified
     ? `${row.client_name} has been notified.`
-    : "The appointment time was updated. This client has no email on file.";
+    : "The appointment time was updated. No email address on file for them.";
 
   return htmlResponse(
     showUpOwnerActionResultPage("Reschedule confirmed.", subtext),

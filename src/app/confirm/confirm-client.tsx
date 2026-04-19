@@ -95,7 +95,7 @@ export function ConfirmAppointmentActions({
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
         <p className="text-lg font-semibold text-slate-800">
-          Got it, we&apos;ll let the clinic know you can&apos;t make it.
+          Got it — we&apos;ll let the team know you can&apos;t make it.
         </p>
       </div>
     );
@@ -105,7 +105,7 @@ export function ConfirmAppointmentActions({
     <div className="space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-center text-sm font-medium uppercase tracking-wide text-slate-500">
-          {isConfirm ? "Confirm visit" : "Cancel visit"}
+          {isConfirm ? "Confirm booking" : "Cancel booking"}
         </p>
         <p className="mt-3 text-center text-xl font-semibold text-slate-900">
           {clientName}

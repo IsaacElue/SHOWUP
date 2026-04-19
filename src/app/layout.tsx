@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ShowUp",
-  description: "AI Appointment No-Show Reducer",
+  description: "Fewer missed appointments — reminders and confirmations for service businesses.",
 };
 
 export default function RootLayout({

@@ -33,7 +33,7 @@ export default async function ReschedulePage({
         <div className="mx-auto max-w-md pt-8 text-center">
           <p className="text-xl font-bold text-emerald-600">ShowUp</p>
           <p className="mt-8 text-slate-600">
-            This link doesn&apos;t look right. Ask your clinic for a new confirmation email.
+            This link doesn&apos;t look right. Ask the team for a new confirmation email.
           </p>
         </div>
       </main>

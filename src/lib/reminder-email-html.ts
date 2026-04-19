@@ -135,7 +135,7 @@ export function buildBookingConfirmationEmailPlainText(
   const base = baseUrl.replace(/\/$/, "");
   const rescheduleUrl = `${base}/reschedule?token=${encodeURIComponent(confirmationToken)}`;
   const cancelUrl = `${base}/confirm?token=${encodeURIComponent(confirmationToken)}&response=N`;
-  return `Hi ${clientName}, your appointment has been booked for ${dateStr} at ${timeStr}. We'll send you a reminder before your visit.
+  return `Hi ${clientName}, your appointment has been booked for ${dateStr} at ${timeStr}. We'll send you a reminder before your appointment.
 
 Reschedule: ${rescheduleUrl}
 Cancel: ${cancelUrl}
@@ -161,7 +161,7 @@ export function buildBookingConfirmationEmailHtml(
                 Hi ${safeName}, your appointment has been booked for <strong>${safeDate}</strong> at <strong>${safeTime}</strong>.
               </p>
               <p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#52525b;">
-                We&apos;ll send you a reminder before your visit.
+                We&apos;ll send you a reminder before your appointment.
               </p>
               <p style="margin:24px 0 16px;font-size:15px;line-height:1.5;color:#52525b;">
                 Need to make a change?
@@ -192,7 +192,7 @@ export function buildOwnerRescheduleNotificationPlainText(
   acceptUrl: string,
   declineUrl: string
 ) {
-  return `Client has requested a reschedule to ${newWhenLabel}.
+  return `${clientName} has requested a reschedule to ${newWhenLabel}.
 
 Accept: ${acceptUrl}
 Decline: ${declineUrl}
@@ -210,7 +210,7 @@ export function buildOwnerRescheduleNotificationHtml(
   const safeWhen = escapeHtml(newWhenLabel);
   const inner = `
               <p style="margin:0;font-size:16px;line-height:1.55;color:#18181b;">
-                Client <strong>${safeName}</strong> has requested a reschedule to <strong>${safeWhen}</strong>.
+                <strong>${safeName}</strong> has requested a reschedule to <strong>${safeWhen}</strong>.
               </p>
               <p style="margin:20px 0 16px;font-size:15px;line-height:1.5;color:#52525b;">
                 Choose an action:

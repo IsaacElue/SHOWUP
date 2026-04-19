@@ -332,8 +332,8 @@ export default function Home() {
     setAppointmentTime("");
     setMessage(
       trimmedEmail
-        ? "Saved. We’ll remind them by text and email before the visit."
-        : "Saved. We’ll remind them by text before the visit."
+        ? "Saved. We’ll remind them by text and email before their appointment."
+        : "Saved. We’ll remind them by text before their appointment."
     );
     setAddOpen(false);
     await loadAppointments(session.user.id);
@@ -519,7 +519,7 @@ export default function Home() {
                 Welcome back
               </h1>
               <p className="mt-2 text-sm text-slate-600">
-                Sign in to see who’s coming in today.
+                Sign in to manage today’s bookings and reminders.
               </p>
             </div>
 
@@ -754,7 +754,7 @@ export default function Home() {
                 New appointment
               </h2>
               <p className="text-sm text-slate-500">
-                We’ll text them before the visit. Add their email if you want an email reminder too.
+                We’ll text them before their appointment. Add their email if you want an email reminder too.
               </p>
             </div>
             <form onSubmit={handleAddAppointment} className="space-y-4 px-5 py-4">

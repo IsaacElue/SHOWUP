@@ -78,8 +78,8 @@ export async function GET(req: Request) {
   }
 
   const subtext = clientNotified
-    ? "Client notified."
-    : "We couldn’t email this client — no email on file.";
+    ? "They’ve been notified."
+    : "We couldn’t send them an email — no address on file.";
 
   return htmlResponse(
     showUpOwnerActionResultPage("Reschedule declined.", subtext),

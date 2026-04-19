@@ -35,8 +35,7 @@ export default async function ConfirmPage({
         <div className="mx-auto max-w-md pt-8 text-center">
           <p className="text-xl font-bold text-emerald-600">ShowUp</p>
           <p className="mt-8 text-slate-600">
-            This link doesn&apos;t look right. Ask your clinic for a new reminder
-            email.
+            This link doesn&apos;t look right. Ask the team for a new reminder email.
           </p>
         </div>
       </main>
