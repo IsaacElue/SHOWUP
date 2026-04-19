@@ -75,6 +75,10 @@ async function sendTwilioSms(to: string, body: string) {
   }
 }
 
+/**
+ * Vercel cron: GET + Authorization: Bearer CRON_SECRET.
+ * Manual trigger: POST + x-reminder-secret: REMINDER_CRON_SECRET.
+ */
 function isAuthorized(req: Request) {
   const authHeader = req.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ")
@@ -82,20 +86,21 @@ function isAuthorized(req: Request) {
     : null;
 
   const cronSecret = process.env.CRON_SECRET;
-  const localSecret = process.env.REMINDER_CRON_SECRET;
-  const legacyHeaderSecret = req.headers.get("x-reminder-secret");
+  const manualSecret = process.env.REMINDER_CRON_SECRET;
+  const headerSecret = req.headers.get("x-reminder-secret");
 
-  if (cronSecret && bearerToken === cronSecret) return true;
-  if (localSecret && legacyHeaderSecret === localSecret) return true;
+  if (req.method === "GET") {
+    return Boolean(cronSecret && bearerToken === cronSecret);
+  }
+
+  if (req.method === "POST") {
+    return Boolean(manualSecret && headerSecret === manualSecret);
+  }
 
   return false;
 }
 
-export async function POST(req: Request) {
-  if (!isAuthorized(req)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function runReminderSend() {
   if (!supabaseAdmin) {
     return Response.json({ error: "Server not configured" }, { status: 500 });
   }
@@ -210,4 +215,20 @@ export async function POST(req: Request) {
     emailed2h,
     emailErrors,
   });
+}
+
+export async function GET(req: Request) {
+  if (!isAuthorized(req)) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return runReminderSend();
+}
+
+export async function POST(req: Request) {
+  if (!isAuthorized(req)) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return runReminderSend();
 }
