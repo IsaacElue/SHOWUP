@@ -485,7 +485,7 @@ export default function Home() {
 
   const shellClassName = session
     ? "min-h-screen bg-gradient-to-b from-emerald-50/40 via-slate-50 to-slate-100 pb-10"
-    : "flex min-h-screen flex-col bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 pb-10 [background-image:radial-gradient(ellipse_120%_80%_at_50%_-30%,rgba(16,185,129,0.14),transparent_55%),radial-gradient(circle_at_100%_0%,rgba(148,163,184,0.12)_0%,transparent_42%),radial-gradient(circle_at_0%_100%,rgba(16,185,129,0.06)_0%,transparent_45%)]";
+    : "flex min-h-screen flex-col bg-gradient-to-b from-white via-slate-50 to-slate-100 pb-10";
 
   const mainClassName = session
     ? "mx-auto max-w-5xl px-4 pt-6 sm:px-6 sm:pt-8"
