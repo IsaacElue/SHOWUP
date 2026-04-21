@@ -17,6 +17,12 @@ type Appointment = {
   status: AppointmentStatus;
 };
 
+type AccessStatus = {
+  allowed: boolean;
+  trialEndsAt: string | null;
+  reason?: string;
+};
+
 const PHONE_PREFIX = "+353";
 
 function dublinDateString(iso: string) {
@@ -149,6 +155,7 @@ export default function Home() {
     text: string;
     ok: boolean;
   } | null>(null);
+  const [accessStatus, setAccessStatus] = useState<AccessStatus | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -163,6 +170,7 @@ export default function Home() {
       setSession(newSession);
       if (!newSession) {
         setAppointments([]);
+        setAccessStatus(null);
       }
     });
 
@@ -174,7 +182,14 @@ export default function Home() {
   useEffect(() => {
     if (!session) return;
 
-    void loadAppointments(session.user.id);
+    void (async () => {
+      const allowed = await checkDashboardAccess();
+      if (allowed) {
+        await loadAppointments(session.user.id);
+      } else {
+        setAppointments([]);
+      }
+    })();
   }, [session]);
 
   useEffect(() => {
@@ -215,6 +230,45 @@ export default function Home() {
     setAppointmentsLoading(false);
   }
 
+  async function checkDashboardAccess() {
+    if (!supabase) return false;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      setAccessStatus({ allowed: false, trialEndsAt: null, reason: "unauthorized" });
+      return false;
+    }
+
+    let res: Response;
+    try {
+      res = await fetch("/api/account/access-status", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch {
+      setAccessStatus({ allowed: false, trialEndsAt: null, reason: "network" });
+      setMessage(friendlyGenericMessage());
+      return false;
+    }
+
+    const data = (await res.json().catch(() => ({}))) as AccessStatus & { error?: string };
+    if (!res.ok) {
+      setAccessStatus({ allowed: false, trialEndsAt: null, reason: data.error ?? "error" });
+      setMessage(friendlyGenericMessage());
+      return false;
+    }
+
+    setAccessStatus({
+      allowed: Boolean(data.allowed),
+      trialEndsAt: data.trialEndsAt ?? null,
+      reason: data.reason,
+    });
+    return Boolean(data.allowed);
+  }
+
   async function handleSignUp(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!supabase) return;
@@ -222,11 +276,31 @@ export default function Home() {
     setLoading(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
       setMessage(friendlyAuthMessage(error.message));
     } else {
+      const userId = data.user?.id;
+      const signedUpEmail = data.user?.email;
+      const signedUpAt = data.user?.created_at;
+      if (userId && signedUpEmail) {
+        try {
+          await fetch("/api/signup/new-user", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId,
+              email: signedUpEmail,
+              signedUpAt,
+            }),
+          });
+        } catch {
+          // Signup succeeded; notification/profile bootstrap is best-effort.
+        }
+      }
       setMessage(
         "You’re almost there — check your inbox to confirm your email, then sign in below."
       );
@@ -584,6 +658,22 @@ export default function Home() {
                 {loading ? "Please wait…" : "Create account"}
               </button>
             </form>
+          </div>
+        ) : accessStatus && !accessStatus.allowed ? (
+          <div className="mx-auto mt-8 w-full max-w-2xl rounded-3xl border border-amber-200 bg-white/95 px-6 py-10 text-center shadow-sm sm:px-10">
+            <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
+              Your free trial has ended
+            </h1>
+            <p className="mt-3 text-base leading-7 text-slate-700">
+              To keep using ShowUp contact{" "}
+              <a
+                href="mailto:isaac@showupapp.org"
+                className="font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-4"
+              >
+                isaac@showupapp.org
+              </a>{" "}
+              to get started.
+            </p>
           </div>
         ) : (
           <>

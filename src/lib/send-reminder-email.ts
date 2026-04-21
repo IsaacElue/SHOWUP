@@ -155,3 +155,48 @@ export async function sendRescheduleDeclinedClientEmail(to: string, clientName: 
     throw new Error(error.message);
   }
 }
+
+export async function sendNewSignupNotificationEmail(userEmail: string, signedUpAtIso: string) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL ?? DEFAULT_BOOKING_FROM;
+  if (!apiKey) {
+    throw new Error("Missing RESEND_API_KEY");
+  }
+
+  const safeWhen = new Date(signedUpAtIso).toLocaleString("en-IE", {
+    timeZone: "Europe/Dublin",
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New ShowUp signup</title>
+  </head>
+  <body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#0f172a;">
+    <h2 style="margin:0 0 12px;">New ShowUp signup</h2>
+    <p style="margin:0 0 8px;"><strong>Email:</strong> ${userEmail}</p>
+    <p style="margin:0;"><strong>Signed up:</strong> ${safeWhen}</p>
+  </body>
+</html>`;
+  const text = `New ShowUp signup
+
+Email: ${userEmail}
+Signed up: ${safeWhen}`;
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from,
+    to: "isaac@showupapp.org",
+    subject: "New ShowUp signup",
+    html,
+    text,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
