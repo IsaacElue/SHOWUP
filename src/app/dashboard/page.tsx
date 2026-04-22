@@ -302,13 +302,18 @@ export default function DashboardPage() {
     }
 
     const trimmedEmail = clientEmail.trim();
+    if (!trimmedEmail) {
+      setMessage("Client email is required to send reminders.");
+      setLoading(false);
+      return;
+    }
     const { data: inserted, error } = await supabase
       .from("appointments")
       .insert({
         user_id: session.user.id,
         client_name: clientName.trim(),
         client_phone: clientPhone.trim(),
-        client_email: trimmedEmail === "" ? null : trimmedEmail,
+        client_email: trimmedEmail,
         confirmation_token: crypto.randomUUID(),
         appointment_at: appointmentAtIso,
       })
@@ -321,7 +326,7 @@ export default function DashboardPage() {
       return;
     }
 
-    if (trimmedEmail && inserted?.id) {
+    if (inserted?.id) {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (token) {
@@ -345,11 +350,7 @@ export default function DashboardPage() {
     setClientEmail("");
     setAppointmentDate(todayDublin());
     setAppointmentTime("");
-    setMessage(
-      trimmedEmail
-        ? "Saved. We’ll remind them by text and email before their appointment."
-        : "Saved. We’ll remind them by text before their appointment."
-    );
+    setMessage("Saved. We’ll remind them by email before their appointment.");
     setAddOpen(false);
     await loadAppointments(session.user.id);
     setLoading(false);
@@ -730,7 +731,7 @@ export default function DashboardPage() {
                 New appointment
               </h2>
               <p className="text-sm text-slate-500">
-                We’ll text them before their appointment. Add their email if you want an email reminder too.
+                We’ll email them before their appointment. Phone is optional.
               </p>
             </div>
             <form onSubmit={handleAddAppointment} className="space-y-4 px-5 py-4">
@@ -753,14 +754,12 @@ export default function DashboardPage() {
                   autoComplete="tel"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
-                  required
+                  placeholder="Phone (optional)"
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
                 />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
-                  Client email <span className="font-normal text-slate-500">(optional)</span>
-                </span>
+                <span className="text-sm font-medium text-slate-700">Client email</span>
                 <input
                   type="email"
                   inputMode="email"
@@ -768,6 +767,7 @@ export default function DashboardPage() {
                   value={clientEmail}
                   onChange={(e) => setClientEmail(e.target.value)}
                   placeholder="name@example.com"
+                  required
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
                 />
               </label>
