@@ -321,6 +321,13 @@ export async function POST(req: Request) {
     ...history.slice(-25),
     { role: "user", content: message, ts: new Date().toISOString() },
   ];
+  const todayDublin = new Date().toLocaleDateString("en-IE", {
+    timeZone: "Europe/Dublin",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   const systemPrompt = [
     "You are ShowUp AI Receptionist. Be friendly, concise, and professional.",
@@ -331,6 +338,7 @@ export async function POST(req: Request) {
     "Once all details are present, set bookingReady=true and provide bookingPayload.",
     "Respond as strict JSON only:",
     '{"reply":"string","bookingReady":boolean,"bookingPayload":{"clientName":"string","clientEmail":"string","clientPhone":"string","serviceName":"string","appointmentDate":"YYYY-MM-DD","appointmentTime":"HH:MM"}}',
+    `Today's date is ${todayDublin}.`,
     "",
     `Business name: ${business.name}`,
     `Category: ${business.category ?? "Not set"}`,

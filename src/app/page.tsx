@@ -113,7 +113,7 @@ export default function MarketingHomePage() {
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
               ShowUp&apos;s AI books appointments, answers client questions, and sends reminders
-              automatically — so you never miss a booking or lose a client to a no-show.
+              automatically, so you never miss a booking or lose a client to a no-show.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
               <Link
@@ -121,7 +121,7 @@ export default function MarketingHomePage() {
                 className="inline-flex w-full max-w-xs items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:opacity-95 sm:w-auto"
                 style={{ backgroundColor: brand }}
               >
-                Start Free Trial — 2 weeks free
+                Start Free Trial, 2 weeks free
               </Link>
               <a
                 href="#features"
@@ -145,18 +145,18 @@ export default function MarketingHomePage() {
               {[
                 {
                   step: "1",
-                  title: "Add ShowUp to your website",
-                  body: "Paste one line of code and your AI front desk is live.",
+                  title: "Add it to your website",
+                  body: "We send you one line of code. Paste it on your site and your AI receptionist is live instantly.",
                 },
                 {
                   step: "2",
-                  title: "Clients chat and book instantly",
-                  body: "Your AI handles enquiries and books appointments 24/7 automatically.",
+                  title: "Clients chat and get booked",
+                  body: "Clients ask questions and book appointments in a natural conversation. Your AI handles it all, day or night.",
                 },
                 {
                   step: "3",
-                  title: "You see everything in one place",
-                  body: "Dashboard shows bookings, conversations, and reminders in real time.",
+                  title: "You stay in control",
+                  body: "See every booking and conversation on your dashboard. Get reminders sent automatically. Never chase a client again.",
                 },
               ].map((item) => (
                 <div
@@ -185,7 +185,7 @@ export default function MarketingHomePage() {
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 "AI books appointments automatically",
-                "24/7 availability — never miss an enquiry",
+                "24/7 availability, never miss an enquiry",
                 "Automatic 24h and 2h reminders",
                 "One-click confirm, cancel or reschedule",
                 "Real-time dashboard",
@@ -222,7 +222,7 @@ export default function MarketingHomePage() {
               Pricing
             </h2>
             <p className="mx-auto mt-2 max-w-xl text-center text-slate-600">
-              All plans include a 2-week free trial. No card required to start.
+              All plans include a 2-week free trial.
             </p>
             <div className="mt-12 grid gap-6 lg:grid-cols-3">
               <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -302,7 +302,7 @@ export default function MarketingHomePage() {
             <h2 className="text-2xl font-semibold text-slate-900 sm:text-3xl">About</h2>
             <p className="mt-6 text-base leading-7 text-slate-600 sm:text-lg">
               ShowUp was built for small service businesses in Ireland that take bookings by phone
-              or in person. We know no-shows are frustrating and costly. ShowUp fixes that — simply,
+              or in person. We know no-shows are frustrating and costly. ShowUp fixes that, simply,
               automatically, and affordably.
             </p>
           </div>
