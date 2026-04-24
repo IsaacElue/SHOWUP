@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import { appointmentAtDublinToUtcIso } from "@/lib/dublin-appointment";
@@ -171,6 +171,7 @@ export default function DashboardPage() {
   } | null>(null);
   const [accessStatus, setAccessStatus] = useState<AccessStatus | null>(null);
   const [showSetupBanner, setShowSetupBanner] = useState(false);
+  const [businessId, setBusinessId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"appointments" | "conversations">("appointments");
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(false);
@@ -230,19 +231,25 @@ export default function DashboardPage() {
         }
         setShowSetupBanner(true);
       } else {
+        setBusinessId(business.id);
         setShowSetupBanner(false);
       }
       const allowed = await checkDashboardAccess();
       if (allowed) {
         await loadAppointments(session.user.id);
         if (business?.id) {
-          await loadConversations(business.id);
+          await loadConversations(session.user.id);
         }
       } else {
         setAppointments([]);
       }
     })();
-  }, [session, router]);
+  }, [session, router, loadConversations]);
+
+  useEffect(() => {
+    if (activeTab !== "conversations" || !session) return;
+    void loadConversations(session.user.id);
+  }, [activeTab, session, loadConversations]);
 
   useEffect(() => {
     if (!addOpen) return;
@@ -282,21 +289,57 @@ export default function DashboardPage() {
     setAppointmentsLoading(false);
   }
 
-  async function loadConversations(currentBusinessId: string) {
+  const loadConversations = useCallback(async (userId: string) => {
     if (!supabase) return;
 
     setConversationsLoading(true);
-    const { data, error } = await supabase
-      .from("widget_conversations")
-      .select("id, session_id, messages, status, client_id, created_at")
-      .eq("business_id", currentBusinessId)
-      .order("created_at", { ascending: false });
+    const { data: businessRows, error: businessesError } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("user_id", userId);
 
-    if (error) {
+    if (businessesError) {
+      console.error("[dashboard] conversations businesses lookup failed", businessesError);
       setMessage(friendlyGenericMessage());
       setConversationsLoading(false);
       return;
     }
+
+    const businessIds = (businessRows ?? []).map((row) => row.id as string).filter(Boolean);
+    if (businessIds.length === 0) {
+      console.info("[dashboard] no businesses found for user conversations", { userId });
+      setConversations([]);
+      setConversationClients({});
+      setConversationsLoading(false);
+      return;
+    }
+
+    console.info("[dashboard] loading conversations", {
+      userId,
+      businessId,
+      businessIds,
+    });
+
+    const { count } = await supabase
+      .from("widget_conversations")
+      .select("id", { count: "exact", head: true })
+      .in("business_id", businessIds);
+    console.info("[dashboard] widget_conversations count", { businessIds, count });
+
+    const { data, error } = await supabase
+      .from("widget_conversations")
+      .select("id, session_id, messages, status, client_id, created_at")
+      .in("business_id", businessIds)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[dashboard] conversations query failed", { businessIds, error });
+      setMessage(friendlyGenericMessage());
+      setConversationsLoading(false);
+      return;
+    }
+
+    console.info("[dashboard] conversations loaded", { businessIds, rows: (data ?? []).length });
 
     const rows = ((data ?? []) as ConversationRow[]).map((row) => ({
       ...row,
@@ -323,7 +366,7 @@ export default function DashboardPage() {
     }
 
     setConversationsLoading(false);
-  }
+  }, [businessId]);
 
   async function checkDashboardAccess() {
     if (!supabase) return false;

@@ -27,7 +27,9 @@ const widgetScript = `(() => {
     localStorage.setItem(sessionStorageKey, sessionId);
   }
 
-  var businessName = localStorage.getItem(businessNameStorageKey) || "ShowUp";
+  var storedBusinessName = localStorage.getItem(businessNameStorageKey) || "";
+  var uuidLikeKey = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedBusinessName);
+  var businessName = storedBusinessName && !uuidLikeKey ? storedBusinessName : "ShowUp";
   var isOpen = localStorage.getItem(openStorageKey) === "1";
   var isSending = false;
   var messages = [];
@@ -54,7 +56,10 @@ const widgetScript = `(() => {
     ".showup-msg{max-width:86%;padding:9px 11px;border-radius:12px;font:500 13px/1.4 system-ui;white-space:pre-wrap;word-wrap:break-word}",
     ".showup-msg.user{margin-left:auto;background:" + BRAND + ";color:#fff;border-bottom-right-radius:4px}",
     ".showup-msg.bot{margin-right:auto;background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-bottom-left-radius:4px}",
-    ".showup-input-wrap{border-top:1px solid #e5e7eb;background:#fff;padding:10px;display:flex;gap:8px}",
+    ".showup-reset-wrap{border-top:1px solid #e5e7eb;background:#fff;padding:8px 10px 0}",
+    ".showup-reset{border:0;background:transparent;padding:0;color:#6b7280;font:500 12px/1.2 system-ui;text-decoration:underline;cursor:pointer}",
+    ".showup-reset:hover{color:#374151}",
+    ".showup-input-wrap{background:#fff;padding:10px;display:flex;gap:8px}",
     ".showup-input{flex:1;border:1px solid #cbd5e1;border-radius:10px;padding:10px;outline:none;font:500 13px/1.4 system-ui}",
     ".showup-input:focus{border-color:" + BRAND + ";box-shadow:0 0 0 2px rgba(26,127,90,.15)}",
     ".showup-send{border:0;border-radius:10px;background:" + BRAND + ";color:#fff;font:600 13px/1 system-ui;padding:0 14px;cursor:pointer}",
@@ -74,12 +79,13 @@ const widgetScript = `(() => {
   tooltip.textContent = "Book an appointment";
   var panel = document.createElement("section");
   panel.className = "showup-panel";
-  panel.innerHTML = '<header class="showup-header"><div class="showup-brand"><span class="showup-logo">S</span><div><p class="showup-title"></p><p class="showup-subtitle">Book an appointment</p></div></div><button type="button" class="showup-close" aria-label="Close chat">×</button></header><div class="showup-messages"></div><form class="showup-input-wrap"><input class="showup-input" type="text" placeholder="Type your message..." maxlength="500"/><button class="showup-send" type="submit">Send</button></form>';
+  panel.innerHTML = '<header class="showup-header"><div class="showup-brand"><span class="showup-logo">S</span><div><p class="showup-title"></p><p class="showup-subtitle">Book an appointment</p></div></div><button type="button" class="showup-close" aria-label="Close chat">×</button></header><div class="showup-messages"></div><div class="showup-reset-wrap"><button type="button" class="showup-reset">Start a new booking</button></div><form class="showup-input-wrap"><input class="showup-input" type="text" placeholder="Type your message..." maxlength="500"/><button class="showup-send" type="submit">Send</button></form>';
 
   var titleEl = panel.querySelector(".showup-title");
   if (titleEl) titleEl.textContent = businessName;
   var messagesEl = panel.querySelector(".showup-messages");
   var closeBtn = panel.querySelector(".showup-close");
+  var resetBtn = panel.querySelector(".showup-reset");
   var formEl = panel.querySelector(".showup-input-wrap");
   var inputEl = panel.querySelector(".showup-input");
   var sendBtn = panel.querySelector(".showup-send");
@@ -88,6 +94,20 @@ const widgetScript = `(() => {
     localStorage.setItem(storageKey, JSON.stringify(messages));
     localStorage.setItem(openStorageKey, isOpen ? "1" : "0");
     localStorage.setItem(businessNameStorageKey, businessName);
+  }
+
+  function newSessionId() {
+    return window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : "sess_" + Math.random().toString(36).slice(2);
+  }
+
+  function resetConversation() {
+    messages = [];
+    sessionId = newSessionId();
+    localStorage.setItem(sessionStorageKey, sessionId);
+    localStorage.removeItem(storageKey);
+    renderMessages();
+    persistState();
+    if (inputEl) inputEl.focus();
   }
 
   function renderMessages() {
@@ -146,6 +166,7 @@ const widgetScript = `(() => {
       if (data && typeof data.businessName === "string" && data.businessName) {
         businessName = data.businessName;
         if (titleEl) titleEl.textContent = businessName;
+        localStorage.setItem(businessNameStorageKey, businessName);
       }
       var reply = data && typeof data.reply === "string" && data.reply.trim() ? data.reply.trim() : "Thanks — I can help with that. Could you share your preferred date and time?";
       messages.push({ role: "assistant", content: reply, ts: Date.now() });
@@ -161,6 +182,7 @@ const widgetScript = `(() => {
 
   fab.addEventListener("click", function () { togglePanel(); });
   if (closeBtn) closeBtn.addEventListener("click", function () { togglePanel(false); });
+  if (resetBtn) resetBtn.addEventListener("click", resetConversation);
   if (formEl) formEl.addEventListener("submit", handleSubmit);
   if (inputEl) inputEl.addEventListener("keydown", function (e) { if (e.key === "Escape") togglePanel(false); });
 
