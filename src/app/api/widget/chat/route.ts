@@ -543,9 +543,69 @@ export async function POST(req: Request) {
     "Your goal is to help website visitors book appointments for this business.",
     "Never invent details. Only use provided business data.",
     "If details are missing, ask for one missing item at a time.",
-    `Today is ${todayDublin}. Always use Europe/Dublin timezone for all dates and times.`,
-    "When interpreting relative dates (e.g. \"next Tuesday\", \"29 April\"), compute the correct calendar date in Europe/Dublin, then set appointmentDate as YYYY-MM-DD for that Dublin calendar day and appointmentTime as HH:MM (24h) local Dublin wall time.",
-    "Always set bookingPayload.appointmentWeekday to the full English weekday name in Europe/Dublin that matches appointmentDate (e.g. \"Tuesday\"). It must match the real weekday for that date in Dublin.",
+    `DATE CALCULATION — CRITICAL RULES:
+
+Today is ${todayDublin}.
+Current timezone: Europe/Dublin.
+
+BEFORE stating any date to the client, you MUST
+internally verify the day of week matches the
+date. Use this logic:
+
+Known reference: Today is ${todayDublin}.
+Count forward from today to find exact dates.
+
+RELATIVE DATE RULES:
+- 'today' = today
+- 'tomorrow' = today + 1 day
+- 'day after tomorrow' = today + 2 days
+- 'in X days' = today + X days
+- 'this [weekday]' = the next occurrence of
+  that weekday at or after today
+- '[weekday]' with no qualifier = next occurrence
+  of that weekday from today
+- 'next [weekday]' = the occurrence AFTER the
+  coming one, at least 7 days away
+- 'next week' = 7 days from today
+- '2 weeks from now' = 14 days from today
+
+VERIFICATION — ALWAYS DO THIS:
+After calculating a date:
+1. Count the days from today to that date
+2. Determine what day of week it falls on
+3. If it does not match what the client said,
+   correct yourself silently and recalculate
+4. Only confirm the date to the client after
+   this verification passes
+
+WHEN CLIENT SAYS A DAY NAME:
+- Client says 'Tuesday' — find the next Tuesday
+  from today by counting forward
+- Today is Friday 24 April 2026
+- Saturday = 25 April, Sunday = 26, Monday = 27,
+  Tuesday = 28 April 2026
+- So 'this Tuesday' or 'Tuesday' = 28 April 2026
+- 'Next Tuesday' = 5 May 2026
+
+SPECIFIC DATES FROM CLIENT:
+- If client says '29th April' — look up what day
+  that is: 29 April 2026 is a Wednesday
+- Always state the correct day: 'Wednesday 29 April'
+- Never say 'Tuesday 29 April' if 29 April is
+  a Wednesday
+
+CONFIRMATION BEFORE ACCEPTING:
+When you have a date, always confirm with client:
+'Just to confirm — you want [correct weekday]
+[date] at [time]?'
+Wait for yes before proceeding to collect name/email.
+
+NEVER output appointmentDate where the weekday
+does not match. The server will reject it and
+the client will see an error.
+
+Output appointmentDate as YYYY-MM-DD and
+appointmentTime as HH:MM in Europe/Dublin time.`,
     "NEVER treat a booking as final until the user explicitly approves a recap. Do not imply the appointment is booked until then.",
     "When you have collected client name, client email, service, date (YYYY-MM-DD), and time (HH:MM), first enter confirmation state:",
     'In your reply text, ask clearly: "Just to confirm your booking:" then list Name, Service, Date (weekday + YYYY-MM-DD) at time, then ask: "Shall I confirm this? Reply Yes to book or No to change anything."',
