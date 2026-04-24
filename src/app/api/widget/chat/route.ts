@@ -317,10 +317,13 @@ export async function POST(req: Request) {
   const incomingHistory = safeMessages(parsed.conversationHistory);
   const storedHistory = safeMessages(conversationRow?.messages);
   const history = incomingHistory.length ? incomingHistory : storedHistory;
-  const fullConversation: ChatMessage[] = [
-    ...history.slice(-25),
-    { role: "user", content: message, ts: new Date().toISOString() },
-  ];
+  const baseConversation = history.slice(-25);
+  const lastMessage = baseConversation[baseConversation.length - 1];
+  const alreadyContainsIncomingUserMessage =
+    lastMessage?.role === "user" && lastMessage.content.trim() === message.trim();
+  const fullConversation: ChatMessage[] = alreadyContainsIncomingUserMessage
+    ? baseConversation
+    : [...baseConversation, { role: "user", content: message, ts: new Date().toISOString() }];
   const todayDublin = new Date().toLocaleDateString("en-IE", {
     timeZone: "Europe/Dublin",
     weekday: "long",
