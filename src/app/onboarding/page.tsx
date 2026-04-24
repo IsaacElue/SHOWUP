@@ -12,8 +12,9 @@ import {
   type ServiceDraft,
   type WeeklyHours,
 } from "@/lib/businesses";
+import { slugifyBusinessName } from "@/lib/slug";
 
-type BusinessRow = { id: string; widget_key: string };
+type BusinessRow = { id: string; widget_key: string; slug: string };
 
 const DAY_ROWS: Array<{ key: keyof WeeklyHours; label: string }> = [
   { key: "mon", label: "Monday" },
@@ -47,6 +48,7 @@ export default function OnboardingPage() {
   const [serviceEdited, setServiceEdited] = useState(false);
   const [hours, setHours] = useState<WeeklyHours>(DEFAULT_WEEKLY_HOURS);
   const [widgetKey, setWidgetKey] = useState<string | null>(null);
+  const [bookingSlug, setBookingSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -103,6 +105,30 @@ export default function OnboardingPage() {
     return `<script src="https://www.showupapp.org/widget.js" data-key="${widgetKey}"></script>`;
   }, [widgetKey]);
 
+  const bookingLink = useMemo(() => {
+    if (!bookingSlug) return "";
+    const base =
+      (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.showupapp.org").replace(/\/$/, "");
+    return `${base}/book/${bookingSlug}`;
+  }, [bookingSlug]);
+
+  async function findAvailableSlug(name: string, userId: string): Promise<string> {
+    if (!supabase) return slugifyBusinessName(name);
+    const base = slugifyBusinessName(name);
+    for (let i = 0; i < 20; i += 1) {
+      const candidate = i === 0 ? base : `${base}-${i + 1}`;
+      const { data } = await supabase
+        .from("businesses")
+        .select("id, user_id")
+        .eq("slug", candidate)
+        .maybeSingle();
+      if (!data || (data as { user_id?: string }).user_id === userId) {
+        return candidate;
+      }
+    }
+    return `${base}-${Math.random().toString(36).slice(2, 6)}`;
+  }
+
   async function saveBusinessAndServices() {
     if (!supabase || !sessionUserId) return;
     if (!businessName.trim()) {
@@ -126,12 +152,14 @@ export default function OnboardingPage() {
     setSaving(true);
     setMessage(null);
 
+    const slug = await findAvailableSlug(businessName.trim(), sessionUserId);
     const { data: business, error: businessError } = await supabase
       .from("businesses")
       .upsert(
         {
           user_id: sessionUserId,
           name: businessName.trim(),
+          slug,
           category,
           description: description.trim() || null,
           location: location.trim() || null,
@@ -139,7 +167,7 @@ export default function OnboardingPage() {
         },
         { onConflict: "user_id" }
       )
-      .select("id, widget_key")
+      .select("id, widget_key, slug")
       .single<BusinessRow>();
 
     if (businessError || !business) {
@@ -175,6 +203,7 @@ export default function OnboardingPage() {
     }
 
     setWidgetKey(business.widget_key);
+    setBookingSlug(business.slug);
     setStep(4);
     setSaving(false);
   }
@@ -432,6 +461,12 @@ export default function OnboardingPage() {
               <pre className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-800">
                 {embedCode}
               </pre>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-900">
+                  Share this link with clients who don&apos;t have access to your website:
+                </p>
+                <p className="mt-2 break-all text-sm text-[#1A7F5A]">{bookingLink}</p>
+              </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"

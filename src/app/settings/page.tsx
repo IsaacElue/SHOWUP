@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { DEFAULT_WEEKLY_HOURS, type ServiceDraft, type WeeklyHours } from "@/lib/businesses";
+import { slugifyBusinessName } from "@/lib/slug";
 
 type Business = {
   id: string;
@@ -12,6 +13,7 @@ type Business = {
   category: string | null;
   description: string | null;
   location: string | null;
+  slug: string | null;
   available_hours: WeeklyHours | null;
 };
 
@@ -55,7 +57,7 @@ export default function SettingsPage() {
 
       const { data: businessRow } = await supabase
         .from("businesses")
-        .select("id, name, category, description, location, available_hours")
+        .select("id, name, category, description, location, slug, available_hours")
         .eq("user_id", userId)
         .maybeSingle<Business>();
 
@@ -114,6 +116,7 @@ export default function SettingsPage() {
       .from("businesses")
       .update({
         name: business.name.trim(),
+        slug: slugifyBusinessName((business.slug || business.name || "").trim()),
         category: business.category || null,
         description: business.description || null,
         location: business.location || null,
@@ -199,6 +202,30 @@ export default function SettingsPage() {
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
             />
           </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-slate-700">Public booking slug</span>
+            <input
+              value={business.slug ?? ""}
+              onChange={(e) =>
+                setBusiness((prev) =>
+                  prev ? { ...prev, slug: slugifyBusinessName(e.target.value) } : prev
+                )
+              }
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
+            />
+          </label>
+          <p className="text-sm text-slate-600">
+            Your public booking page:{" "}
+            <a
+              href={`${(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.showupapp.org").replace(/\/$/, "")}/book/${business.slug ?? ""}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-[#1A7F5A] underline"
+            >
+              {(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.showupapp.org").replace(/\/$/, "")}
+              /book/{business.slug ?? ""}
+            </a>
+          </p>
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-slate-700">Category</span>
             <input

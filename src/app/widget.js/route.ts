@@ -151,16 +151,19 @@ const widgetScript = `(() => {
   async function handleSubmit(event) {
     event.preventDefault();
     if (!inputEl || isSending) return;
-    var text = inputEl.value.trim();
-    if (!text) return;
-
-    messages.push({ role: "user", content: text, ts: Date.now() });
-    inputEl.value = "";
-    renderMessages();
-    persistState();
-
     isSending = true;
     if (sendBtn) sendBtn.disabled = true;
+    var text = inputEl.value.trim();
+    if (!text) {
+      isSending = false;
+      if (sendBtn) sendBtn.disabled = false;
+      return;
+    }
+
+    inputEl.value = "";
+    messages.push({ role: "user", content: text, ts: Date.now() });
+    renderMessages();
+    persistState();
     try {
       var data = await sendToApi(text);
       if (data && typeof data.businessName === "string" && data.businessName) {
