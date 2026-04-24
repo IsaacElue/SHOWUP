@@ -19,6 +19,23 @@ type Appointment = {
   status: AppointmentStatus;
 };
 
+type ConversationStatus = "active" | "booked" | "abandoned";
+
+type ConversationMessage = {
+  role?: string;
+  content?: string;
+  ts?: string;
+};
+
+type ConversationRow = {
+  id: string;
+  session_id: string;
+  messages: ConversationMessage[] | null;
+  status: ConversationStatus;
+  client_id: string | null;
+  created_at: string;
+};
+
 type AccessStatus = {
   allowed: boolean;
   trialEndsAt: string | null;
@@ -125,6 +142,12 @@ const statusBadgeClass: Record<AppointmentStatus, string> = {
   no_response: "border border-amber-200/90 bg-amber-100 text-amber-900",
 };
 
+const conversationStatusBadgeClass: Record<ConversationStatus, string> = {
+  active: "bg-sky-100 text-sky-900",
+  booked: "bg-emerald-100 text-emerald-900",
+  abandoned: "bg-slate-200 text-slate-700",
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -148,6 +171,13 @@ export default function DashboardPage() {
   } | null>(null);
   const [accessStatus, setAccessStatus] = useState<AccessStatus | null>(null);
   const [showSetupBanner, setShowSetupBanner] = useState(false);
+  const [activeTab, setActiveTab] = useState<"appointments" | "conversations">("appointments");
+  const [conversations, setConversations] = useState<ConversationRow[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [expandedConversationId, setExpandedConversationId] = useState<string | null>(null);
+  const [conversationClients, setConversationClients] = useState<
+    Record<string, { name: string | null; email: string | null }>
+  >({});
 
   useEffect(() => {
     if (!supabase) {
@@ -205,6 +235,9 @@ export default function DashboardPage() {
       const allowed = await checkDashboardAccess();
       if (allowed) {
         await loadAppointments(session.user.id);
+        if (business?.id) {
+          await loadConversations(business.id);
+        }
       } else {
         setAppointments([]);
       }
@@ -247,6 +280,49 @@ export default function DashboardPage() {
 
     setAppointments((data ?? []) as Appointment[]);
     setAppointmentsLoading(false);
+  }
+
+  async function loadConversations(currentBusinessId: string) {
+    if (!supabase) return;
+
+    setConversationsLoading(true);
+    const { data, error } = await supabase
+      .from("widget_conversations")
+      .select("id, session_id, messages, status, client_id, created_at")
+      .eq("business_id", currentBusinessId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setMessage(friendlyGenericMessage());
+      setConversationsLoading(false);
+      return;
+    }
+
+    const rows = ((data ?? []) as ConversationRow[]).map((row) => ({
+      ...row,
+      messages: Array.isArray(row.messages) ? row.messages : [],
+    }));
+    setConversations(rows);
+
+    const clientIds = [...new Set(rows.map((row) => row.client_id).filter(Boolean))] as string[];
+    if (clientIds.length > 0) {
+      const { data: clients } = await supabase
+        .from("showup_clients")
+        .select("id, name, email")
+        .in("id", clientIds);
+      const clientMap: Record<string, { name: string | null; email: string | null }> = {};
+      for (const client of clients ?? []) {
+        clientMap[(client as { id: string }).id] = {
+          name: (client as { name: string | null }).name,
+          email: (client as { email: string | null }).email,
+        };
+      }
+      setConversationClients(clientMap);
+    } else {
+      setConversationClients({});
+    }
+
+    setConversationsLoading(false);
   }
 
   async function checkDashboardAccess() {
@@ -626,7 +702,34 @@ export default function DashboardPage() {
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            <div className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setActiveTab("appointments")}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  activeTab === "appointments"
+                    ? "bg-emerald-600 text-white"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Appointments
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("conversations")}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  activeTab === "conversations"
+                    ? "bg-emerald-600 text-white"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                Conversations
+              </button>
+            </div>
+
+            {activeTab === "appointments" ? (
+              <>
+                <div className="mt-6 grid gap-4 lg:grid-cols-3">
               <section className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
                   Confirmed
@@ -655,7 +758,7 @@ export default function DashboardPage() {
               </section>
             </div>
 
-            <div className="mt-10">
+                <div className="mt-10">
               <h2 className="text-lg font-semibold text-slate-900">Appointments</h2>
               <p className="mt-1 text-sm text-slate-600">Newest days first.</p>
 
@@ -744,6 +847,108 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+              </>
+            ) : (
+              <div className="mt-8">
+                <h2 className="text-lg font-semibold text-slate-900">Conversations</h2>
+                <p className="mt-1 text-sm text-slate-600">Most recent chats first.</p>
+
+                {conversationsLoading ? (
+                  <p className="mt-4 text-sm text-slate-500">Loading…</p>
+                ) : conversations.length === 0 ? (
+                  <p className="mt-4 text-sm text-slate-500">
+                    No conversations yet. Once clients chat with your AI, their conversations will
+                    appear here.
+                  </p>
+                ) : (
+                  <div className="mt-6 space-y-3">
+                    {conversations.map((conversation) => {
+                      const messageCount = conversation.messages?.length ?? 0;
+                      const client =
+                        conversation.client_id ? conversationClients[conversation.client_id] : null;
+                      const isOpen = expandedConversationId === conversation.id;
+                      return (
+                        <article
+                          key={conversation.id}
+                          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedConversationId((prev) =>
+                                prev === conversation.id ? null : conversation.id
+                              )
+                            }
+                            className="w-full text-left"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {new Date(conversation.created_at).toLocaleString("en-IE", {
+                                    timeZone: "Europe/Dublin",
+                                    weekday: "short",
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                                {conversation.status === "booked" && client ? (
+                                  <p className="mt-1 text-xs text-slate-600">
+                                    {client.name || "Client"} {client.email ? `• ${client.email}` : ""}
+                                  </p>
+                                ) : null}
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {messageCount} {messageCount === 1 ? "message" : "messages"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${conversationStatusBadgeClass[conversation.status]}`}
+                                >
+                                  {conversation.status}
+                                </span>
+                                <span className="text-xs font-medium text-slate-500">
+                                  {isOpen ? "Hide" : "View"}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+
+                          {isOpen ? (
+                            <div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                              {(conversation.messages ?? []).length === 0 ? (
+                                <p className="text-sm text-slate-500">No transcript available.</p>
+                              ) : (
+                                (conversation.messages ?? []).map((msg, index) => {
+                                  const role =
+                                    msg.role === "assistant" || msg.role === "bot"
+                                      ? "assistant"
+                                      : "user";
+                                  return (
+                                    <div
+                                      key={`${conversation.id}-${index}`}
+                                      className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
+                                        role === "user"
+                                          ? "ml-auto bg-emerald-600 text-white"
+                                          : "mr-auto border border-slate-200 bg-white text-slate-800"
+                                      }`}
+                                    >
+                                      {msg.content || "…"}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          ) : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
