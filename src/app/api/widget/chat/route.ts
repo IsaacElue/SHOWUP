@@ -28,6 +28,16 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+function errorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return "Unknown error";
+  }
+}
+
 function jsonWithCors(body: unknown, init?: ResponseInit) {
   return Response.json(body, {
     ...init,
@@ -36,6 +46,24 @@ function jsonWithCors(body: unknown, init?: ResponseInit) {
       ...(init?.headers ?? {}),
     },
   });
+}
+
+function fail(
+  stage: string,
+  err: unknown,
+  status = 500,
+  extra?: Record<string, unknown>
+) {
+  const message = errorMessage(err);
+  console.error("[widget-chat]", stage, { message, ...extra });
+  return jsonWithCors(
+    {
+      error: message,
+      stage,
+      ...extra,
+    },
+    { status }
+  );
 }
 
 function safeMessages(input: unknown): ChatMessage[] {
@@ -135,10 +163,31 @@ async function callClaudeSystem(
   systemPrompt: string,
   messages: ChatMessage[]
 ): Promise<string> {
-  const anthropicMessages = messages.map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
+  const anthropicMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const m of messages) {
+    const content = typeof m.content === "string" ? m.content.trim() : "";
+    if (!content) continue;
+    const role: "user" | "assistant" = m.role === "assistant" ? "assistant" : "user";
+    const prev = anthropicMessages[anthropicMessages.length - 1];
+    if (!prev || prev.role !== role) {
+      anthropicMessages.push({ role, content });
+      continue;
+    }
+    // Merge consecutive same-role turns to keep strict alternation.
+    prev.content = `${prev.content}\n\n${content}`;
+  }
+
+  // Anthropic expects messages to start with user.
+  while (anthropicMessages.length && anthropicMessages[0].role !== "user") {
+    anthropicMessages.shift();
+  }
+
+  if (!anthropicMessages.length) {
+    anthropicMessages.push({
+      role: "user",
+      content: "Hello",
+    });
+  }
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -149,7 +198,7 @@ async function callClaudeSystem(
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
+      max_tokens: 1024,
       temperature: 0.3,
       system: systemPrompt,
       messages: anthropicMessages,
@@ -183,14 +232,25 @@ export async function POST(req: Request) {
 
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicApiKey) {
-    return jsonWithCors({ error: "Missing ANTHROPIC_API_KEY" }, { status: 500 });
+    return jsonWithCors(
+      {
+        error: "Missing ANTHROPIC_API_KEY",
+        stage: "env",
+        env: {
+          hasAnthropicKey: false,
+          hasSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+          hasSupabaseServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        },
+      },
+      { status: 500 }
+    );
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return jsonWithCors({ error: "Invalid JSON" }, { status: 400 });
+    return fail("parse_body", "Invalid JSON", 400);
   }
 
   const parsed = body as Partial<ChatBody>;
@@ -200,7 +260,10 @@ export async function POST(req: Request) {
 
   if (!widgetKey || !sessionId || !message) {
     return jsonWithCors(
-      { error: "widgetKey, sessionId, and message are required" },
+      {
+        error: "widgetKey, sessionId, and message are required",
+        stage: "validate_body",
+      },
       { status: 400 }
     );
   }
@@ -211,10 +274,19 @@ export async function POST(req: Request) {
     .eq("widget_key", widgetKey)
     .maybeSingle();
   if (businessError) {
-    return jsonWithCors({ error: businessError.message }, { status: 500 });
+    return fail("lookup_business", businessError.message, 500, {
+      widgetKeyPrefix: widgetKey.slice(0, 8),
+    });
   }
   if (!business) {
-    return jsonWithCors({ error: "Invalid widget key" }, { status: 404 });
+    return jsonWithCors(
+      {
+        error: "Invalid widget key",
+        stage: "lookup_business",
+        widgetKeyPrefix: widgetKey.slice(0, 8),
+      },
+      { status: 404 }
+    );
   }
 
   const { data: services, error: servicesError } = await supabaseAdmin
@@ -224,10 +296,10 @@ export async function POST(req: Request) {
     .eq("active", true)
     .order("created_at", { ascending: true });
   if (servicesError) {
-    return jsonWithCors({ error: servicesError.message }, { status: 500 });
+    return fail("load_services", servicesError.message, 500, { businessId: business.id });
   }
 
-  const { data: conversationRow } = await supabaseAdmin
+  const { data: conversationRow, error: conversationLoadError } = await supabaseAdmin
     .from("widget_conversations")
     .select("id, messages, status, client_id")
     .eq("business_id", business.id)
@@ -235,6 +307,12 @@ export async function POST(req: Request) {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (conversationLoadError) {
+    return fail("load_conversation", conversationLoadError.message, 500, {
+      businessId: business.id,
+      sessionId,
+    });
+  }
 
   const incomingHistory = safeMessages(parsed.conversationHistory);
   const storedHistory = safeMessages(conversationRow?.messages);
@@ -273,8 +351,7 @@ export async function POST(req: Request) {
   try {
     aiText = await callClaudeSystem(anthropicApiKey, systemPrompt, fullConversation);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Claude request failed";
-    return jsonWithCors({ error: msg }, { status: 500 });
+    return fail("claude_request", e, 500, { businessId: business.id, sessionId });
   }
 
   const parsedAi = parseClaudeJson(aiText);
@@ -306,9 +383,17 @@ export async function POST(req: Request) {
         const bookedTime = bookingJson.appointment?.appointmentTime ?? parsedAi.booking.appointmentTime;
         const bookedService = bookingJson.appointment?.serviceName ?? parsedAi.booking.serviceName;
         finalReply = `Perfect, you are booked for ${bookedService} on ${bookedDate} at ${bookedTime}. A confirmation email is on the way.`;
+      } else {
+        const bookErr = await bookingRes.json().catch(() => ({}));
+        console.error("[widget-chat] booking_call_failed", {
+          status: bookingRes.status,
+          body: bookErr,
+        });
       }
-    } catch {
-      // Keep assistant reply if booking endpoint is not ready yet.
+    } catch (e) {
+      console.error("[widget-chat] booking_call_exception", {
+        message: errorMessage(e),
+      });
     }
   }
 
@@ -318,7 +403,7 @@ export async function POST(req: Request) {
   ];
 
   if (conversationRow?.id) {
-    await supabaseAdmin
+    const { error: conversationUpdateError } = await supabaseAdmin
       .from("widget_conversations")
       .update({
         messages: updatedMessages,
@@ -326,14 +411,27 @@ export async function POST(req: Request) {
         client_id: clientId,
       })
       .eq("id", conversationRow.id);
+    if (conversationUpdateError) {
+      return fail("save_conversation_update", conversationUpdateError.message, 500, {
+        conversationId: conversationRow.id,
+      });
+    }
   } else {
-    await supabaseAdmin.from("widget_conversations").insert({
+    const { error: conversationInsertError } = await supabaseAdmin
+      .from("widget_conversations")
+      .insert({
       business_id: business.id,
       session_id: sessionId,
       messages: updatedMessages,
       status: finalStatus,
       client_id: clientId,
-    });
+      });
+    if (conversationInsertError) {
+      return fail("save_conversation_insert", conversationInsertError.message, 500, {
+        businessId: business.id,
+        sessionId,
+      });
+    }
   }
 
   return jsonWithCors({
