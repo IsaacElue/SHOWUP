@@ -180,6 +180,85 @@ export default function DashboardPage() {
     Record<string, { name: string | null; email: string | null }>
   >({});
 
+  const loadConversations = useCallback(async (userId: string) => {
+    if (!supabase) return;
+
+    setConversationsLoading(true);
+    const { data: businessRows, error: businessesError } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("user_id", userId);
+
+    if (businessesError) {
+      console.error("[dashboard] conversations businesses lookup failed", businessesError);
+      setMessage(friendlyGenericMessage());
+      setConversationsLoading(false);
+      return;
+    }
+
+    const businessIds = (businessRows ?? []).map((row) => row.id as string).filter(Boolean);
+    if (businessIds.length === 0) {
+      console.info("[dashboard] no businesses found for user conversations", { userId });
+      setConversations([]);
+      setConversationClients({});
+      setConversationsLoading(false);
+      return;
+    }
+
+    console.info("[dashboard] loading conversations", {
+      userId,
+      businessId,
+      businessIds,
+    });
+
+    const { count } = await supabase
+      .from("widget_conversations")
+      .select("id", { count: "exact", head: true })
+      .in("business_id", businessIds);
+    console.info("[dashboard] widget_conversations count", { businessIds, count });
+
+    const { data, error } = await supabase
+      .from("widget_conversations")
+      .select("id, session_id, messages, status, client_id, created_at")
+      .in("business_id", businessIds)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[dashboard] conversations query failed", { businessIds, error });
+      setMessage(friendlyGenericMessage());
+      setConversationsLoading(false);
+      return;
+    }
+
+    console.info("[dashboard] conversations loaded", { businessIds, rows: (data ?? []).length });
+
+    const rows = ((data ?? []) as ConversationRow[]).map((row) => ({
+      ...row,
+      messages: Array.isArray(row.messages) ? row.messages : [],
+    }));
+    setConversations(rows);
+
+    const clientIds = [...new Set(rows.map((row) => row.client_id).filter(Boolean))] as string[];
+    if (clientIds.length > 0) {
+      const { data: clients } = await supabase
+        .from("showup_clients")
+        .select("id, name, email")
+        .in("id", clientIds);
+      const clientMap: Record<string, { name: string | null; email: string | null }> = {};
+      for (const client of clients ?? []) {
+        clientMap[(client as { id: string }).id] = {
+          name: (client as { name: string | null }).name,
+          email: (client as { email: string | null }).email,
+        };
+      }
+      setConversationClients(clientMap);
+    } else {
+      setConversationClients({});
+    }
+
+    setConversationsLoading(false);
+  }, [businessId]);
+
   useEffect(() => {
     if (!supabase) {
       queueMicrotask(() => setAuthChecked(true));
@@ -288,85 +367,6 @@ export default function DashboardPage() {
     setAppointments((data ?? []) as Appointment[]);
     setAppointmentsLoading(false);
   }
-
-  const loadConversations = useCallback(async (userId: string) => {
-    if (!supabase) return;
-
-    setConversationsLoading(true);
-    const { data: businessRows, error: businessesError } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", userId);
-
-    if (businessesError) {
-      console.error("[dashboard] conversations businesses lookup failed", businessesError);
-      setMessage(friendlyGenericMessage());
-      setConversationsLoading(false);
-      return;
-    }
-
-    const businessIds = (businessRows ?? []).map((row) => row.id as string).filter(Boolean);
-    if (businessIds.length === 0) {
-      console.info("[dashboard] no businesses found for user conversations", { userId });
-      setConversations([]);
-      setConversationClients({});
-      setConversationsLoading(false);
-      return;
-    }
-
-    console.info("[dashboard] loading conversations", {
-      userId,
-      businessId,
-      businessIds,
-    });
-
-    const { count } = await supabase
-      .from("widget_conversations")
-      .select("id", { count: "exact", head: true })
-      .in("business_id", businessIds);
-    console.info("[dashboard] widget_conversations count", { businessIds, count });
-
-    const { data, error } = await supabase
-      .from("widget_conversations")
-      .select("id, session_id, messages, status, client_id, created_at")
-      .in("business_id", businessIds)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("[dashboard] conversations query failed", { businessIds, error });
-      setMessage(friendlyGenericMessage());
-      setConversationsLoading(false);
-      return;
-    }
-
-    console.info("[dashboard] conversations loaded", { businessIds, rows: (data ?? []).length });
-
-    const rows = ((data ?? []) as ConversationRow[]).map((row) => ({
-      ...row,
-      messages: Array.isArray(row.messages) ? row.messages : [],
-    }));
-    setConversations(rows);
-
-    const clientIds = [...new Set(rows.map((row) => row.client_id).filter(Boolean))] as string[];
-    if (clientIds.length > 0) {
-      const { data: clients } = await supabase
-        .from("showup_clients")
-        .select("id, name, email")
-        .in("id", clientIds);
-      const clientMap: Record<string, { name: string | null; email: string | null }> = {};
-      for (const client of clients ?? []) {
-        clientMap[(client as { id: string }).id] = {
-          name: (client as { name: string | null }).name,
-          email: (client as { email: string | null }).email,
-        };
-      }
-      setConversationClients(clientMap);
-    } else {
-      setConversationClients({});
-    }
-
-    setConversationsLoading(false);
-  }, [businessId]);
 
   async function checkDashboardAccess() {
     if (!supabase) return false;
