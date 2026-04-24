@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 function friendlyAuthMessage(raw: string) {
@@ -24,15 +24,22 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [checkedSession, setCheckedSession] = useState(false);
 
-  async function redirectAfterAuth(userId: string) {
+  const redirectAfterAuth = useCallback(async (userId: string, createdAt?: string | null) => {
     if (!supabase) return;
     const { data: business } = await supabase
       .from("businesses")
       .select("id")
       .eq("user_id", userId)
       .maybeSingle();
-    router.replace(business ? "/dashboard" : "/onboarding");
-  }
+    if (business) {
+      router.replace("/dashboard");
+      return;
+    }
+
+    const createdMs = createdAt ? new Date(createdAt).getTime() : Number.NaN;
+    const isNewUser = Number.isFinite(createdMs) && Date.now() - createdMs < 60 * 60 * 1000;
+    router.replace(isNewUser ? "/onboarding" : "/dashboard");
+  }, [router]);
 
   useEffect(() => {
     if (!supabase) {
@@ -42,7 +49,7 @@ export default function LoginPage() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        void redirectAfterAuth(data.session.user.id);
+        void redirectAfterAuth(data.session.user.id, data.session.user.created_at);
       } else {
         setCheckedSession(true);
       }
@@ -52,12 +59,12 @@ export default function LoginPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        void redirectAfterAuth(session.user.id);
+        void redirectAfterAuth(session.user.id, session.user.created_at);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [redirectAfterAuth]);
 
   async function handleSignUp(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -107,7 +114,7 @@ export default function LoginPage() {
     } else {
       setMessage(null);
       if (data.user?.id) {
-        await redirectAfterAuth(data.user.id);
+        await redirectAfterAuth(data.user.id, data.user.created_at);
       } else {
         router.replace("/dashboard");
       }

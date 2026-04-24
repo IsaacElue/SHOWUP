@@ -109,11 +109,11 @@ export default function MarketingHomePage() {
         <section className="border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white px-4 py-16 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-              Fewer no-shows. More revenue.
+              Your AI Front Desk. Always On.
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-              ShowUp automatically reminds your clients before every appointment. They confirm or
-              cancel in one click. You see everything in one place.
+              ShowUp&apos;s AI books appointments, answers client questions, and sends reminders
+              automatically — so you never miss a booking or lose a client to a no-show.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
               <Link
@@ -145,18 +145,18 @@ export default function MarketingHomePage() {
               {[
                 {
                   step: "1",
-                  title: "Add your appointment",
-                  body: "Add client name, phone, optional email, date and time — all in one place.",
+                  title: "Add ShowUp to your website",
+                  body: "Paste one line of code and your AI front desk is live.",
                 },
                 {
                   step: "2",
-                  title: "They get reminded automatically",
-                  body: "Clients receive a branded email reminder 24h and 2h before their appointment.",
+                  title: "Clients chat and book instantly",
+                  body: "Your AI handles enquiries and books appointments 24/7 automatically.",
                 },
                 {
                   step: "3",
-                  title: "You see who’s coming",
-                  body: "Your dashboard shows confirmed, cancelled, and no reply — updated in real time.",
+                  title: "You see everything in one place",
+                  body: "Dashboard shows bookings, conversations, and reminders in real time.",
                 },
               ].map((item) => (
                 <div
@@ -184,10 +184,10 @@ export default function MarketingHomePage() {
             </h2>
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {[
-                "Instant booking confirmation email",
+                "AI books appointments automatically",
+                "24/7 availability — never miss an enquiry",
                 "Automatic 24h and 2h reminders",
-                "One-click confirm or cancel for clients",
-                "Reschedule flow with owner approval",
+                "One-click confirm, cancel or reschedule",
                 "Real-time dashboard",
                 "Works for any service business",
               ].map((title) => (
