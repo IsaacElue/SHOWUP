@@ -1,3 +1,5 @@
+import { DateTime } from "luxon";
+
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 type ChatBody = {
@@ -20,7 +22,112 @@ type BookingPayload = {
   serviceName: string;
   appointmentDate: string;
   appointmentTime: string;
+  /** Optional echo from the model; must match the real weekday in Europe/Dublin for appointmentDate. */
+  appointmentWeekday?: string;
 };
+
+type PendingBookingRow = BookingPayload | null;
+
+function dublinWeekdayLongForYyyyMmDd(dateStr: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = DateTime.fromObject({ year: y, month: mo, day: d }, { zone: "Europe/Dublin" });
+  if (!dt.isValid) return null;
+  return dt.setLocale("en").toFormat("cccc");
+}
+
+function normalizeBookingPayload(raw: BookingPayload): BookingPayload {
+  return {
+    clientName: raw.clientName.trim(),
+    clientEmail: raw.clientEmail.trim(),
+    clientPhone: typeof raw.clientPhone === "string" ? raw.clientPhone.trim() : "",
+    serviceName: raw.serviceName.trim(),
+    appointmentDate: raw.appointmentDate.trim(),
+    appointmentTime: raw.appointmentTime.trim(),
+    appointmentWeekday:
+      typeof raw.appointmentWeekday === "string" ? raw.appointmentWeekday.trim() : undefined,
+  };
+}
+
+function bookingPayloadForApi(b: BookingPayload): Omit<BookingPayload, "appointmentWeekday"> {
+  const { appointmentWeekday: _ignored, ...rest } = b;
+  return rest;
+}
+
+function validateDublinBookingPayload(
+  b: BookingPayload
+): { ok: true; normalized: BookingPayload } | { ok: false; error: string } {
+  const normalized = normalizeBookingPayload(b);
+  const { appointmentDate, appointmentTime } = normalized;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
+    return { ok: false, error: "appointmentDate must be YYYY-MM-DD (Europe/Dublin calendar date)." };
+  }
+  if (!/^\d{2}:\d{2}$/.test(appointmentTime)) {
+    return { ok: false, error: "appointmentTime must be HH:MM (24h, Europe/Dublin wall clock)." };
+  }
+  const actualWeekday = dublinWeekdayLongForYyyyMmDd(appointmentDate);
+  if (!actualWeekday) {
+    return { ok: false, error: "Invalid appointment date for Europe/Dublin." };
+  }
+  const claimed = normalized.appointmentWeekday?.trim();
+  if (claimed) {
+    const a = actualWeekday.toLowerCase();
+    const c = claimed.toLowerCase();
+    if (a !== c && !a.startsWith(c.slice(0, 3)) && !c.startsWith(a.slice(0, 3))) {
+      return {
+        ok: false,
+        error: `That date is a ${actualWeekday} in Ireland (Europe/Dublin), not ${claimed}. Fix appointmentDate or the weekday.`,
+      };
+    }
+  }
+  return { ok: true, normalized };
+}
+
+function isAffirmativeBookingReply(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+  if (/^(yes|yeah|yep|y)\b/.test(t)) return true;
+  if (/^(ok|okay)\b/.test(t)) return true;
+  if (/\b(confirm|confirmed|book it|please book|go ahead|sounds good|lock it in|that's right|that is right)\b/.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+function isNegativeBookingReply(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+  if (/^(no|nope|nah)\b/.test(t)) return true;
+  if (/\b(change|wrong|incorrect|different|cancel|not yet|don't book|do not book)\b/.test(t)) return true;
+  return false;
+}
+
+function parsePendingBookingFromRow(raw: unknown): BookingPayload | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (
+    typeof o.clientName === "string" &&
+    typeof o.clientEmail === "string" &&
+    typeof o.serviceName === "string" &&
+    typeof o.appointmentDate === "string" &&
+    typeof o.appointmentTime === "string"
+  ) {
+    return {
+      clientName: o.clientName,
+      clientEmail: o.clientEmail,
+      clientPhone: typeof o.clientPhone === "string" ? o.clientPhone : "",
+      serviceName: o.serviceName,
+      appointmentDate: o.appointmentDate,
+      appointmentTime: o.appointmentTime,
+      appointmentWeekday: typeof o.appointmentWeekday === "string" ? o.appointmentWeekday : undefined,
+    };
+  }
+  return null;
+}
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -102,7 +209,14 @@ function servicesText(
     .join("\n");
 }
 
-function parseClaudeJson(rawText: string): { reply: string; booking?: BookingPayload } {
+type ParsedClaude = {
+  reply: string;
+  /** When true, all required fields are present and the assistant is asking the user to confirm — do not book yet. */
+  awaitingBookingConfirmation?: boolean;
+  bookingPayload?: BookingPayload;
+};
+
+function parseClaudeJson(rawText: string): ParsedClaude {
   const trimmed = rawText.trim();
   let candidate = trimmed;
   if (candidate.startsWith("```")) {
@@ -113,6 +227,7 @@ function parseClaudeJson(rawText: string): { reply: string; booking?: BookingPay
   try {
     const parsed = JSON.parse(candidate) as {
       reply?: unknown;
+      awaitingBookingConfirmation?: unknown;
       bookingReady?: unknown;
       bookingPayload?: unknown;
     };
@@ -120,10 +235,13 @@ function parseClaudeJson(rawText: string): { reply: string; booking?: BookingPay
       typeof parsed.reply === "string" && parsed.reply.trim()
         ? parsed.reply.trim()
         : "Thanks for your message. Could you share your preferred date and time?";
-    const bookingReady = parsed.bookingReady === true;
     const bp = parsed.bookingPayload;
+    const awaitingExplicit = parsed.awaitingBookingConfirmation === true;
+    const legacyReady = parsed.bookingReady === true;
+    const awaitingBookingConfirmation = awaitingExplicit || legacyReady;
+
     if (
-      bookingReady &&
+      awaitingBookingConfirmation &&
       bp &&
       typeof bp === "object" &&
       typeof (bp as BookingPayload).clientName === "string" &&
@@ -135,7 +253,8 @@ function parseClaudeJson(rawText: string): { reply: string; booking?: BookingPay
       const bookingPayload = bp as BookingPayload;
       return {
         reply,
-        booking: {
+        awaitingBookingConfirmation: true,
+        bookingPayload: {
           clientName: bookingPayload.clientName.trim(),
           clientEmail: bookingPayload.clientEmail.trim(),
           clientPhone:
@@ -145,6 +264,10 @@ function parseClaudeJson(rawText: string): { reply: string; booking?: BookingPay
           serviceName: bookingPayload.serviceName.trim(),
           appointmentDate: bookingPayload.appointmentDate.trim(),
           appointmentTime: bookingPayload.appointmentTime.trim(),
+          appointmentWeekday:
+            typeof bookingPayload.appointmentWeekday === "string"
+              ? bookingPayload.appointmentWeekday.trim()
+              : undefined,
         },
       };
     }
@@ -301,7 +424,7 @@ export async function POST(req: Request) {
 
   const { data: conversationRow, error: conversationLoadError } = await supabaseAdmin
     .from("widget_conversations")
-    .select("id, messages, status, client_id")
+    .select("id, messages, status, client_id, pending_booking")
     .eq("business_id", business.id)
     .eq("session_id", sessionId)
     .order("created_at", { ascending: false })
@@ -324,7 +447,9 @@ export async function POST(req: Request) {
   const fullConversation: ChatMessage[] = alreadyContainsIncomingUserMessage
     ? baseConversation
     : [...baseConversation, { role: "user", content: message, ts: new Date().toISOString() }];
-  const todayDublin = new Date().toLocaleDateString("en-IE", {
+
+  const now = new Date();
+  const todayDublin = now.toLocaleDateString("en-IE", {
     timeZone: "Europe/Dublin",
     weekday: "long",
     year: "numeric",
@@ -332,16 +457,107 @@ export async function POST(req: Request) {
     day: "numeric",
   });
 
+  const pendingFromDb = parsePendingBookingFromRow(
+    (conversationRow as { pending_booking?: unknown } | null)?.pending_booking
+  );
+
+  let pendingBookingToStore: PendingBookingRow | undefined;
+
+  let finalReply = "";
+  let finalStatus: "active" | "booked" | "abandoned" = "active";
+  let clientId: string | null = conversationRow?.client_id ?? null;
+  let skipClaude = false;
+
+  if (pendingFromDb && isNegativeBookingReply(message)) {
+    pendingBookingToStore = null;
+  }
+
+  if (pendingFromDb && isAffirmativeBookingReply(message)) {
+    skipClaude = true;
+    const validated = validateDublinBookingPayload(pendingFromDb);
+    if (validated.ok) {
+      try {
+        const bookUrl = new URL("/api/widget/book", req.url).toString();
+        const bookingRes = await fetch(bookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            widgetKey,
+            sessionId,
+            ...bookingPayloadForApi(validated.normalized),
+          }),
+        });
+
+        if (bookingRes.ok) {
+          const bookingJson = (await bookingRes.json().catch(() => ({}))) as {
+            appointment?: { appointmentDate?: string; appointmentTime?: string; serviceName?: string };
+            clientId?: string;
+          };
+          finalStatus = "booked";
+          clientId = bookingJson.clientId ?? clientId;
+          const bookedDate =
+            bookingJson.appointment?.appointmentDate ?? validated.normalized.appointmentDate;
+          const bookedTime =
+            bookingJson.appointment?.appointmentTime ?? validated.normalized.appointmentTime;
+          const bookedService =
+            bookingJson.appointment?.serviceName ?? validated.normalized.serviceName;
+          const wd = dublinWeekdayLongForYyyyMmDd(bookedDate);
+          const datePart = wd ? `${wd} ${bookedDate}` : bookedDate;
+          finalReply = `Perfect, you are booked for ${bookedService} on ${datePart} at ${bookedTime}. A confirmation email is on the way.`;
+          pendingBookingToStore = null;
+        } else {
+          const bookErr = await bookingRes.json().catch(() => ({}));
+          console.error("[widget-chat] booking_call_failed", {
+            status: bookingRes.status,
+            body: bookErr,
+          });
+          finalReply =
+            "I could not complete the booking just now. Please try again in a moment, or say No to change any details first.";
+        }
+      } catch (e) {
+        console.error("[widget-chat] booking_call_exception", {
+          message: errorMessage(e),
+        });
+        finalReply =
+          "I could not complete the booking just now. Please try again in a moment, or say No to change any details first.";
+      }
+    } else {
+      finalReply = `${validated.error} Reply No if you would like to change anything.`;
+      pendingBookingToStore = null;
+    }
+  }
+
+  const pendingForPrompt =
+    pendingFromDb && !isAffirmativeBookingReply(message) && !isNegativeBookingReply(message)
+      ? pendingFromDb
+      : null;
+
+  const pendingContext = pendingForPrompt
+    ? `\nA booking is currently awaiting explicit user confirmation for this session. Stored details (Europe/Dublin): ${JSON.stringify(
+        bookingPayloadForApi(pendingForPrompt)
+      )}. Do not book until the user clearly approves; the server books when they reply affirmatively.`
+    : "";
+
   const systemPrompt = [
     "You are ShowUp AI Receptionist. Be friendly, concise, and professional.",
     "Your goal is to help website visitors book appointments for this business.",
     "Never invent details. Only use provided business data.",
     "If details are missing, ask for one missing item at a time.",
-    "When booking intent is clear, collect exactly: client name, client email, preferred service, preferred date (YYYY-MM-DD), preferred time (HH:MM), optional phone.",
-    "Once all details are present, set bookingReady=true and provide bookingPayload.",
+    `Today is ${todayDublin}. Always use Europe/Dublin timezone for all dates and times.`,
+    "When interpreting relative dates (e.g. \"next Tuesday\", \"29 April\"), compute the correct calendar date in Europe/Dublin, then set appointmentDate as YYYY-MM-DD for that Dublin calendar day and appointmentTime as HH:MM (24h) local Dublin wall time.",
+    "Always set bookingPayload.appointmentWeekday to the full English weekday name in Europe/Dublin that matches appointmentDate (e.g. \"Tuesday\"). It must match the real weekday for that date in Dublin.",
+    "NEVER treat a booking as final until the user explicitly approves a recap. Do not imply the appointment is booked until then.",
+    "When you have collected client name, client email, service, date (YYYY-MM-DD), and time (HH:MM), first enter confirmation state:",
+    'In your reply text, ask clearly: "Just to confirm your booking:" then list Name, Service, Date (weekday + YYYY-MM-DD) at time, then ask: "Shall I confirm this? Reply Yes to book or No to change anything."',
+    "In the same turn, set awaitingBookingConfirmation=true and include bookingPayload with all fields (optional clientPhone, optional appointmentWeekday must match Dublin weekday for appointmentDate).",
+    "awaitingBookingConfirmation must be false while you are still collecting missing fields.",
+    "Only set awaitingBookingConfirmation=true when every required field is present and you are showing the confirmation recap.",
+    "If the user replies No or wants to change something, set awaitingBookingConfirmation=false, help them adjust, then later set awaitingBookingConfirmation=true again with an updated bookingPayload.",
+    "If the user replies with clear approval (Yes, confirm, book it, etc.), you may briefly acknowledge — the server will finalize the booking; keep your reply short.",
     "Respond as strict JSON only:",
-    '{"reply":"string","bookingReady":boolean,"bookingPayload":{"clientName":"string","clientEmail":"string","clientPhone":"string","serviceName":"string","appointmentDate":"YYYY-MM-DD","appointmentTime":"HH:MM"}}',
-    `Today's date is ${todayDublin}.`,
+    '{"reply":"string","awaitingBookingConfirmation":boolean,"bookingPayload":{"clientName":"string","clientEmail":"string","clientPhone":"string","serviceName":"string","appointmentDate":"YYYY-MM-DD","appointmentTime":"HH:MM","appointmentWeekday":"string"}}',
+    "When awaitingBookingConfirmation is false, bookingPayload may be null or omitted.",
+    pendingContext,
     "",
     `Business name: ${business.name}`,
     `Category: ${business.category ?? "Not set"}`,
@@ -358,54 +574,29 @@ export async function POST(req: Request) {
     `Available hours JSON: ${JSON.stringify(business.available_hours ?? {})}`,
   ].join("\n");
 
-  let aiText: string;
-  try {
-    aiText = await callClaudeSystem(anthropicApiKey, systemPrompt, fullConversation);
-  } catch (e) {
-    return fail("claude_request", e, 500, { businessId: business.id, sessionId });
+  let aiText = "";
+  if (!skipClaude) {
+    try {
+      aiText = await callClaudeSystem(anthropicApiKey, systemPrompt, fullConversation);
+    } catch (e) {
+      return fail("claude_request", e, 500, { businessId: business.id, sessionId });
+    }
   }
 
-  const parsedAi = parseClaudeJson(aiText);
-  let finalReply = parsedAi.reply;
-  let finalStatus: "active" | "booked" | "abandoned" = "active";
-  let clientId: string | null = conversationRow?.client_id ?? null;
+  if (!skipClaude) {
+    const parsedAi = parseClaudeJson(aiText);
+    finalReply = parsedAi.reply;
 
-  if (parsedAi.booking) {
-    try {
-      const bookUrl = new URL("/api/widget/book", req.url).toString();
-      const bookingRes = await fetch(bookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          widgetKey,
-          sessionId,
-          ...parsedAi.booking,
-        }),
-      });
-
-      if (bookingRes.ok) {
-        const bookingJson = (await bookingRes.json().catch(() => ({}))) as {
-          appointment?: { appointmentDate?: string; appointmentTime?: string; serviceName?: string };
-          clientId?: string;
-        };
-        finalStatus = "booked";
-        clientId = bookingJson.clientId ?? clientId;
-        const bookedDate = bookingJson.appointment?.appointmentDate ?? parsedAi.booking.appointmentDate;
-        const bookedTime = bookingJson.appointment?.appointmentTime ?? parsedAi.booking.appointmentTime;
-        const bookedService = bookingJson.appointment?.serviceName ?? parsedAi.booking.serviceName;
-        finalReply = `Perfect, you are booked for ${bookedService} on ${bookedDate} at ${bookedTime}. A confirmation email is on the way.`;
+    if (parsedAi.awaitingBookingConfirmation && parsedAi.bookingPayload) {
+      const validated = validateDublinBookingPayload(parsedAi.bookingPayload);
+      if (validated.ok) {
+        pendingBookingToStore = validated.normalized;
       } else {
-        const bookErr = await bookingRes.json().catch(() => ({}));
-        console.error("[widget-chat] booking_call_failed", {
-          status: bookingRes.status,
-          body: bookErr,
-        });
+        finalReply = `${validated.error} Please adjust the date or time and we will try again.`;
       }
-    } catch (e) {
-      console.error("[widget-chat] booking_call_exception", {
-        message: errorMessage(e),
-      });
     }
+  } else if (!finalReply) {
+    finalReply = "Thanks — one moment.";
   }
 
   const updatedMessages = [
@@ -413,14 +604,20 @@ export async function POST(req: Request) {
     { role: "assistant" as const, content: finalReply, ts: new Date().toISOString() },
   ];
 
+  const conversationUpdateBase = {
+    messages: updatedMessages,
+    status: finalStatus,
+    client_id: clientId,
+  };
+
   if (conversationRow?.id) {
+    const updatePayload: Record<string, unknown> = { ...conversationUpdateBase };
+    if (pendingBookingToStore !== undefined) {
+      updatePayload.pending_booking = pendingBookingToStore;
+    }
     const { error: conversationUpdateError } = await supabaseAdmin
       .from("widget_conversations")
-      .update({
-        messages: updatedMessages,
-        status: finalStatus,
-        client_id: clientId,
-      })
+      .update(updatePayload as never)
       .eq("id", conversationRow.id);
     if (conversationUpdateError) {
       return fail("save_conversation_update", conversationUpdateError.message, 500, {
@@ -428,15 +625,17 @@ export async function POST(req: Request) {
       });
     }
   } else {
-    const { error: conversationInsertError } = await supabaseAdmin
-      .from("widget_conversations")
-      .insert({
+    const insertPayload: Record<string, unknown> = {
       business_id: business.id,
       session_id: sessionId,
-      messages: updatedMessages,
-      status: finalStatus,
-      client_id: clientId,
-      });
+      ...conversationUpdateBase,
+    };
+    if (pendingBookingToStore !== undefined) {
+      insertPayload.pending_booking = pendingBookingToStore;
+    }
+    const { error: conversationInsertError } = await supabaseAdmin
+      .from("widget_conversations")
+      .insert(insertPayload as never);
     if (conversationInsertError) {
       return fail("save_conversation_insert", conversationInsertError.message, 500, {
         businessId: business.id,
