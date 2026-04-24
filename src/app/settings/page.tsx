@@ -161,10 +161,26 @@ export default function SettingsPage() {
     setSaving(false);
   }
 
+  const categoryOptions = [
+    "Hair Salon",
+    "Barber",
+    "Nail Salon",
+    "Beauty Clinic",
+    "Physiotherapy",
+    "Dental",
+    "Other",
+  ];
+
   if (!supabase) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10">
-        <p className="mx-auto max-w-lg text-center text-slate-600">
+      <div
+        className="min-h-screen px-4 py-10"
+        style={{
+          background: "linear-gradient(135deg, #F0FAF5 0%, #FAFAFA 40%, #F5F8FF 100%)",
+          fontFamily: '"DM Sans", sans-serif',
+        }}
+      >
+        <p className="mx-auto max-w-lg text-center text-sm" style={{ color: "#5B616E" }}>
           This app isn’t fully set up yet. Ask your developer to finish configuration.
         </p>
       </div>
@@ -173,37 +189,94 @@ export default function SettingsPage() {
 
   if (loading || !business) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white via-slate-50 to-slate-100">
-        <p className="text-sm text-slate-600">Loading…</p>
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{
+          background: "linear-gradient(135deg, #F0FAF5 0%, #FAFAFA 40%, #F5F8FF 100%)",
+          fontFamily: '"DM Sans", sans-serif',
+        }}
+      >
+        <p className="text-sm" style={{ color: "#5B616E" }}>
+          Loading...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 px-4 py-8 sm:px-6">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-slate-900">Business settings</h1>
+    <div
+      className="min-h-screen pb-32"
+      style={{
+        background: "linear-gradient(135deg, #F0FAF5 0%, #FAFAFA 40%, #F5F8FF 100%)",
+        fontFamily: '"DM Sans", sans-serif',
+      }}
+    >
+      <header
+        className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur-md"
+        style={{ borderColor: "rgba(15,15,15,0.08)", backgroundColor: "rgba(250,250,250,0.97)" }}
+      >
+        <div className="mx-auto flex w-full max-w-[760px] items-center justify-between gap-3 px-6 py-3">
+          <div className="inline-flex items-center gap-2">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm font-bold text-white"
+              style={{ backgroundColor: "#1A7F5A" }}
+            >
+              S
+            </div>
+            <span className="text-sm font-semibold tracking-tight" style={{ color: "#1A1A1A" }}>
+              ShowUp
+            </span>
+          </div>
           <Link
             href="/dashboard"
-            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+            className="inline-flex items-center justify-center rounded-[24px] border px-4 py-2 text-sm font-medium transition duration-200 ease-in-out hover:bg-white"
+            style={{ borderColor: "rgba(15,15,15,0.12)", color: "#5B616E" }}
           >
             Back to dashboard
           </Link>
         </div>
+      </header>
 
-        <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-lg font-semibold text-slate-900">Profile</h2>
+      <main className="mx-auto w-full max-w-[760px] px-6 py-8">
+        <div className="mb-6">
+          <div className="mb-3 h-[2px] w-10 rounded-full" style={{ backgroundColor: "#1A7F5A" }} />
+          <h1 className="text-3xl font-bold tracking-[-0.02em] sm:text-[36px]" style={{ color: "#1A1A1A" }}>
+            Business Settings
+          </h1>
+          <p className="mt-2 text-sm sm:text-base" style={{ color: "#5B616E" }}>
+            Manage your profile, services, and availability
+          </p>
+        </div>
+
+        <section
+          className="stagger-card space-y-5 rounded-xl border bg-white p-6 sm:p-8"
+          style={{
+            borderColor: "rgba(15,15,15,0.08)",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            borderLeftWidth: "3px",
+            borderLeftColor: "#1A7F5A",
+          }}
+        >
+          <div className="border-b pb-3" style={{ borderColor: "rgba(15,15,15,0.08)" }}>
+            <h2 className="text-lg font-semibold" style={{ color: "#1A1A1A" }}>
+              Profile
+            </h2>
+          </div>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-slate-700">Business name</span>
+            <span className="text-sm font-medium" style={{ color: "#1A1A1A" }}>
+              Business name
+            </span>
             <input
               value={business.name}
               onChange={(e) => setBusiness((prev) => (prev ? { ...prev, name: e.target.value } : prev))}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
+              className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+              style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
             />
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-slate-700">Public booking slug</span>
+            <span className="text-sm font-medium" style={{ color: "#1A1A1A" }}>
+              Public booking slug
+            </span>
             <input
               value={business.slug ?? ""}
               onChange={(e) =>
@@ -211,62 +284,114 @@ export default function SettingsPage() {
                   prev ? { ...prev, slug: slugifyBusinessName(e.target.value) } : prev
                 )
               }
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
+              className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+              style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
             />
           </label>
-          <p className="text-sm text-slate-600">
+          <p className="text-xs sm:text-sm" style={{ color: "#5B616E" }}>
             Your public booking page:{" "}
             <a
               href={`${(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.showupapp.org").replace(/\/$/, "")}/book/${business.slug ?? ""}`}
               target="_blank"
               rel="noreferrer"
-              className="font-medium text-[#1A7F5A] underline"
+              className="font-medium underline"
+              style={{ color: "#1A7F5A" }}
             >
-              {(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.showupapp.org").replace(/\/$/, "")}
-              /book/{business.slug ?? ""}
+              showupapp.org/book/{business.slug ?? ""}
             </a>
           </p>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-slate-700">Category</span>
-            <input
+            <span className="text-sm font-medium" style={{ color: "#1A1A1A" }}>
+              Category
+            </span>
+            <select
               value={business.category ?? ""}
               onChange={(e) =>
                 setBusiness((prev) => (prev ? { ...prev, category: e.target.value } : prev))
               }
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
-            />
+              className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+              style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
+            >
+              <option value="">Select category</option>
+              {categoryOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+              {business.category && !categoryOptions.includes(business.category) ? (
+                <option value={business.category}>{business.category}</option>
+              ) : null}
+            </select>
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-slate-700">Location</span>
+            <span className="text-sm font-medium" style={{ color: "#1A1A1A" }}>
+              Location
+            </span>
             <input
               value={business.location ?? ""}
               onChange={(e) =>
                 setBusiness((prev) => (prev ? { ...prev, location: e.target.value } : prev))
               }
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
+              className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+              style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
             />
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-slate-700">Description</span>
+            <span className="text-sm font-medium" style={{ color: "#1A1A1A" }}>
+              Description
+            </span>
             <textarea
               rows={3}
               value={business.description ?? ""}
               onChange={(e) =>
                 setBusiness((prev) => (prev ? { ...prev, description: e.target.value } : prev))
               }
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
+              className="min-h-[120px] w-full rounded-[10px] border-2 border-transparent px-3 py-2.5 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+              style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
             />
           </label>
-        </div>
+        </section>
 
-        <div className="mt-6 space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-lg font-semibold text-slate-900">Services</h2>
+        <section
+          className="stagger-card mt-6 space-y-4 rounded-xl border bg-white p-6 sm:p-8"
+          style={{
+            borderColor: "rgba(15,15,15,0.08)",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            borderLeftWidth: "3px",
+            borderLeftColor: "#1A7F5A",
+            animationDelay: "0.08s",
+          }}
+        >
+          <div className="border-b pb-3" style={{ borderColor: "rgba(15,15,15,0.08)" }}>
+            <h2 className="text-lg font-semibold" style={{ color: "#1A1A1A" }}>
+              Services
+            </h2>
+          </div>
+          <div className="hidden grid-cols-12 gap-2 px-1 sm:grid">
+            <p className="sm:col-span-5 text-[11px] uppercase tracking-[0.08em]" style={{ color: "#5B616E" }}>
+              Service
+            </p>
+            <p className="sm:col-span-3 text-[11px] uppercase tracking-[0.08em]" style={{ color: "#5B616E" }}>
+              Duration (min)
+            </p>
+            <p className="sm:col-span-3 text-[11px] uppercase tracking-[0.08em]" style={{ color: "#5B616E" }}>
+              Price (EUR)
+            </p>
+            <p className="sm:col-span-1 text-[11px] uppercase tracking-[0.08em]" style={{ color: "#5B616E" }}>
+              &nbsp;
+            </p>
+          </div>
           {services.map((service, index) => (
-            <div key={service.id ?? index} className="grid gap-2 sm:grid-cols-12">
+            <div
+              key={service.id ?? index}
+              className="grid gap-2 border-b pb-3 sm:grid-cols-12"
+              style={{ borderColor: "rgba(15,15,15,0.06)" }}
+            >
               <input
                 value={service.name}
                 onChange={(e) => updateService(index, { name: e.target.value })}
-                className="rounded-lg border border-slate-200 px-3 py-2 sm:col-span-5"
+                className="h-11 rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A] sm:col-span-5"
+                style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
               />
               <input
                 type="number"
@@ -274,7 +399,8 @@ export default function SettingsPage() {
                 step={5}
                 value={service.duration_minutes}
                 onChange={(e) => updateService(index, { duration_minutes: Number(e.target.value || 0) })}
-                className="rounded-lg border border-slate-200 px-3 py-2 sm:col-span-3"
+                className="h-11 rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A] sm:col-span-3"
+                style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
               />
               <input
                 type="number"
@@ -282,12 +408,14 @@ export default function SettingsPage() {
                 step="0.01"
                 value={service.price}
                 onChange={(e) => updateService(index, { price: Number(e.target.value || 0) })}
-                className="rounded-lg border border-slate-200 px-3 py-2 sm:col-span-3"
+                className="h-11 rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A] sm:col-span-3"
+                style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
               />
               <button
                 type="button"
                 onClick={() => setServices((prev) => prev.filter((_, i) => i !== index))}
-                className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 sm:col-span-1"
+                className="h-11 rounded-[10px] px-3 text-sm font-medium transition duration-200 ease-in-out hover:underline sm:col-span-1"
+                style={{ color: "#DC2626" }}
               >
                 X
               </button>
@@ -296,101 +424,205 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => setServices((prev) => [...prev, { name: "", duration_minutes: 30, price: 0 }])}
-            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+            className="inline-flex h-11 w-full items-center justify-center rounded-[10px] border border-dashed px-4 text-sm font-semibold transition duration-200 ease-in-out hover:bg-[#F0FDF8]"
+            style={{ borderColor: "rgba(26,127,90,0.45)", color: "#1A7F5A" }}
           >
-            Add service
+            + Add service
           </button>
-        </div>
+        </section>
 
-        <div className="mt-6 space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-lg font-semibold text-slate-900">Available hours</h2>
+        <section
+          className="stagger-card mt-6 space-y-4 rounded-xl border bg-white p-6 sm:p-8"
+          style={{
+            borderColor: "rgba(15,15,15,0.08)",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            borderLeftWidth: "3px",
+            borderLeftColor: "#1A7F5A",
+            animationDelay: "0.16s",
+          }}
+        >
+          <div className="border-b pb-3" style={{ borderColor: "rgba(15,15,15,0.08)" }}>
+            <h2 className="text-lg font-semibold" style={{ color: "#1A1A1A" }}>
+              Available hours
+            </h2>
+          </div>
           {DAY_ROWS.map((day) => (
-            <div key={day.key} className="grid items-center gap-3 sm:grid-cols-12">
-              <label className="flex items-center gap-2 sm:col-span-4">
-                <input
-                  type="checkbox"
-                  checked={Boolean(business.available_hours?.[day.key].enabled)}
-                  onChange={(e) =>
-                    setBusiness((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            available_hours: {
-                              ...(prev.available_hours ?? DEFAULT_WEEKLY_HOURS),
-                              [day.key]: {
-                                ...(prev.available_hours?.[day.key] ?? DEFAULT_WEEKLY_HOURS[day.key]),
-                                enabled: e.target.checked,
+            <div key={day.key} className="rounded-[10px] border p-3" style={{ borderColor: "rgba(15,15,15,0.06)" }}>
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
+                  {day.label}
+                </span>
+                <label className="toggle-switch">
+                  <input
+                    className="toggle-input"
+                    type="checkbox"
+                    checked={Boolean(business.available_hours?.[day.key].enabled)}
+                    onChange={(e) =>
+                      setBusiness((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              available_hours: {
+                                ...(prev.available_hours ?? DEFAULT_WEEKLY_HOURS),
+                                [day.key]: {
+                                  ...(prev.available_hours?.[day.key] ?? DEFAULT_WEEKLY_HOURS[day.key]),
+                                  enabled: e.target.checked,
+                                },
                               },
-                            },
-                          }
-                        : prev
-                    )
-                  }
-                />
-                <span className="text-sm font-medium text-slate-700">{day.label}</span>
-              </label>
-              <input
-                type="time"
-                value={business.available_hours?.[day.key].start ?? "09:00"}
-                onChange={(e) =>
-                  setBusiness((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          available_hours: {
-                            ...(prev.available_hours ?? DEFAULT_WEEKLY_HOURS),
-                            [day.key]: {
-                              ...(prev.available_hours?.[day.key] ?? DEFAULT_WEEKLY_HOURS[day.key]),
-                              start: e.target.value,
-                            },
-                          },
-                        }
-                      : prev
-                  )
-                }
-                className="rounded-lg border border-slate-200 px-3 py-2 sm:col-span-4"
-              />
-              <input
-                type="time"
-                value={business.available_hours?.[day.key].end ?? "18:00"}
-                onChange={(e) =>
-                  setBusiness((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          available_hours: {
-                            ...(prev.available_hours ?? DEFAULT_WEEKLY_HOURS),
-                            [day.key]: {
-                              ...(prev.available_hours?.[day.key] ?? DEFAULT_WEEKLY_HOURS[day.key]),
-                              end: e.target.value,
-                            },
-                          },
-                        }
-                      : prev
-                  )
-                }
-                className="rounded-lg border border-slate-200 px-3 py-2 sm:col-span-4"
-              />
+                            }
+                          : prev
+                      )
+                    }
+                  />
+                  <span className="toggle-track">
+                    <span className="toggle-thumb" />
+                  </span>
+                </label>
+              </div>
+              {business.available_hours?.[day.key].enabled ? (
+                <div className="grid items-center gap-2 sm:grid-cols-2">
+                  <input
+                    type="time"
+                    value={business.available_hours?.[day.key].start ?? "09:00"}
+                    onChange={(e) =>
+                      setBusiness((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              available_hours: {
+                                ...(prev.available_hours ?? DEFAULT_WEEKLY_HOURS),
+                                [day.key]: {
+                                  ...(prev.available_hours?.[day.key] ?? DEFAULT_WEEKLY_HOURS[day.key]),
+                                  start: e.target.value,
+                                },
+                              },
+                            }
+                          : prev
+                      )
+                    }
+                    className="h-10 rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+                    style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
+                  />
+                  <input
+                    type="time"
+                    value={business.available_hours?.[day.key].end ?? "18:00"}
+                    onChange={(e) =>
+                      setBusiness((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              available_hours: {
+                                ...(prev.available_hours ?? DEFAULT_WEEKLY_HOURS),
+                                [day.key]: {
+                                  ...(prev.available_hours?.[day.key] ?? DEFAULT_WEEKLY_HOURS[day.key]),
+                                  end: e.target.value,
+                                },
+                              },
+                            }
+                          : prev
+                      )
+                    }
+                    className="h-10 rounded-[10px] border-2 border-transparent px-3 text-sm outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+                    style={{ backgroundColor: "#F5F5F7", color: "#1A1A1A" }}
+                  />
+                </div>
+              ) : (
+                <div className="text-xs" style={{ color: "#9CA3AF" }}>
+                  Closed
+                </div>
+              )}
             </div>
           ))}
-        </div>
+        </section>
 
-        <div className="mt-6 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => void saveAll()}
-            disabled={saving}
-            className="rounded-xl bg-[#1A7F5A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#166a4b] disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Save settings"}
-          </button>
-        </div>
         {message ? (
-          <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+          <p
+            className="mt-5 rounded-xl border bg-white px-4 py-3 text-sm shadow-sm"
+            style={{ borderColor: "rgba(15,15,15,0.08)", color: "#5B616E" }}
+          >
             {message}
           </p>
         ) : null}
+      </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 px-4 pb-4 pt-2 sm:inset-x-auto sm:right-8 sm:px-0">
+        <button
+          type="button"
+          onClick={() => void saveAll()}
+          disabled={saving}
+          className="save-floating-btn h-12 w-full rounded-[24px] px-6 text-sm font-semibold text-white transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          style={{ backgroundColor: "#1A7F5A", boxShadow: "0 8px 20px rgba(26,127,90,0.3)" }}
+        >
+          {saving ? "Saving..." : "Save settings"}
+        </button>
       </div>
+
+      <style jsx global>{`
+        .stagger-card {
+          animation: fadeInUp 0.55s ease both;
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .toggle-switch {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+        }
+        .toggle-input {
+          position: absolute;
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .toggle-track {
+          position: relative;
+          width: 44px;
+          height: 24px;
+          border-radius: 999px;
+          background: #d1d5db;
+          transition: background 200ms ease;
+          display: inline-flex;
+          align-items: center;
+          padding: 2px;
+        }
+        .toggle-thumb {
+          width: 20px;
+          height: 20px;
+          border-radius: 999px;
+          background: #ffffff;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+          transform: translateX(0);
+          transition: transform 200ms ease;
+        }
+        .toggle-input:checked + .toggle-track {
+          background: #1a7f5a;
+        }
+        .toggle-input:checked + .toggle-track .toggle-thumb {
+          transform: translateX(20px);
+        }
+        .save-floating-btn:hover {
+          animation: savePulse 0.9s ease;
+        }
+        @keyframes savePulse {
+          0% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.03);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+      `}</style>
     </div>
   );
 }

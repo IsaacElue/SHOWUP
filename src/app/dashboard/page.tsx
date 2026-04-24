@@ -129,13 +129,6 @@ function formatDateGroupHeading(dateKey: string) {
   );
 }
 
-const cardToneByStatus: Record<AppointmentStatus, string> = {
-  confirmed: "border-emerald-100 bg-emerald-50/50",
-  cancelled: "border-rose-100 bg-rose-50/50",
-  no_response:
-    "border-slate-200/70 bg-slate-100/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]",
-};
-
 const statusBadgeClass: Record<AppointmentStatus, string> = {
   confirmed: "bg-emerald-100 text-emerald-900",
   cancelled: "bg-rose-100 text-rose-900",
@@ -327,7 +320,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (activeTab !== "conversations" || !session) return;
-    void loadConversations(session.user.id);
+    queueMicrotask(() => {
+      void loadConversations(session.user.id);
+    });
   }, [activeTab, session, loadConversations]);
 
   useEffect(() => {
@@ -597,14 +592,6 @@ export default function DashboardPage() {
     };
   }, [appointments]);
 
-  const statsSummary = useMemo(() => {
-    if (appointmentsLoading) return "Loading…";
-    const { total, confirmed, cancelled, awaiting } = allTimeStats;
-    if (total === 0) return "No appointments yet.";
-    const apptWord = total === 1 ? "appointment" : "appointments";
-    return `${total} ${apptWord} in total — ${confirmed} confirmed, ${cancelled} cancelled, ${awaiting} awaiting reply`;
-  }, [appointmentsLoading, allTimeStats]);
-
   const appointmentsByDate = useMemo(() => {
     const map = new Map<string, Appointment[]>();
     for (const a of appointments) {
@@ -652,24 +639,39 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 via-slate-50 to-slate-100 pb-10">
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <div
+      className="min-h-screen pb-10"
+      style={{
+        background: "linear-gradient(135deg, #F0FAF5 0%, #FAFAFA 40%, #F5F8FF 100%)",
+        color: "#1A1A1A",
+      }}
+    >
+      <header
+        className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur-md"
+        style={{ borderColor: "rgba(15,15,15,0.08)", backgroundColor: "rgba(250,250,250,0.97)" }}
+      >
+        <div className="mx-auto flex w-full max-w-[1100px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-lg font-bold text-white shadow-sm">
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-lg font-bold text-white shadow-sm"
+              style={{ backgroundColor: "#1A7F5A" }}
+            >
               S
             </span>
             <div className="leading-tight">
-              <p className="text-base font-semibold tracking-tight text-slate-900">
+              <p className="text-base font-semibold tracking-tight" style={{ color: "#1A1A1A" }}>
                 ShowUp
               </p>
-              <p className="text-xs text-slate-500">Fewer no-shows</p>
+              <p className="text-xs" style={{ color: "#5B616E" }}>
+                {session.user.email?.split("@")[0] ?? "Business account"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/settings"
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="rounded-lg border bg-transparent px-4 py-2 text-sm font-medium transition duration-200 ease-in-out hover:bg-[#F5F5F7]"
+              style={{ borderColor: "rgba(15,15,15,0.12)", color: "#1A1A1A" }}
             >
               Settings
             </Link>
@@ -677,15 +679,17 @@ export default function DashboardPage() {
               type="button"
               onClick={handleLogOut}
               disabled={loading}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-lg border bg-transparent px-4 py-2 text-sm font-medium transition duration-200 ease-in-out hover:bg-[#F5F5F7] disabled:opacity-50"
+              style={{ borderColor: "rgba(15,15,15,0.12)", color: "#1A1A1A" }}
             >
               {loading ? "Signing out…" : "Sign out"}
             </button>
           </div>
         </div>
+        <div className="h-px w-full" style={{ backgroundColor: "rgba(26,127,90,0.15)" }} />
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 pt-6 sm:px-6 sm:pt-8">
+      <main className="mx-auto w-full max-w-[1100px] px-4 pt-6 sm:px-6 sm:pt-8">
         {accessStatus && !accessStatus.allowed ? (
           <div className="mx-auto mt-8 w-full max-w-2xl rounded-3xl border border-amber-200 bg-white/95 px-6 py-10 text-center shadow-sm sm:px-10">
             <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
@@ -706,10 +710,11 @@ export default function DashboardPage() {
           <>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
-                  Today
+                <div className="mb-3 h-[2px] w-10 rounded-full" style={{ backgroundColor: "#1A7F5A" }} />
+                <h1 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl" style={{ color: "#1A1A1A" }}>
+                  Dashboard
                 </h1>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-sm" style={{ color: "#5B616E" }}>
                   {new Date().toLocaleDateString("en-IE", {
                     weekday: "long",
                     day: "numeric",
@@ -717,7 +722,9 @@ export default function DashboardPage() {
                     timeZone: "Europe/Dublin",
                   })}
                 </p>
-                <p className="mt-2 text-sm font-medium text-slate-700">{statsSummary}</p>
+                <p className="mt-2 text-sm font-medium" style={{ color: "#5B616E" }}>
+                  {allTimeStats.total} {allTimeStats.total === 1 ? "appointment" : "appointments"} in total
+                </p>
               </div>
               <button
                 type="button"
@@ -725,34 +732,42 @@ export default function DashboardPage() {
                   setMessage(null);
                   setAddOpen(true);
                 }}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-700 sm:w-auto"
+                className="add-appointment-btn inline-flex w-full items-center justify-center gap-2 rounded-[24px] px-5 py-3 text-sm font-semibold text-white transition duration-200 ease-in-out hover:opacity-95 sm:w-auto"
+                style={{
+                  backgroundColor: "#1A7F5A",
+                  boxShadow: "0 6px 16px rgba(26,127,90,0.28)",
+                }}
               >
                 <span className="text-lg leading-none">+</span>
                 Add appointment
               </button>
             </div>
             {showSetupBanner ? (
-              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-4">
-                <p className="text-sm font-medium text-emerald-900">
+              <div
+                className="mt-4 rounded-xl border bg-amber-50/80 px-4 py-4 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-4"
+                style={{ borderColor: "rgba(245,158,11,0.35)", borderLeftWidth: "4px", borderLeftColor: "#F59E0B" }}
+              >
+                <p className="text-sm font-medium" style={{ color: "#7C5200" }}>
                   Complete your AI setup to get your booking widget. It takes 2 minutes.
                 </p>
                 <Link
                   href="/onboarding"
-                  className="mt-3 inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 sm:mt-0"
+                  className="mt-3 inline-flex rounded-[24px] px-4 py-2 text-sm font-semibold text-white transition duration-200 ease-in-out hover:opacity-90 sm:mt-0"
+                  style={{ backgroundColor: "#F59E0B" }}
                 >
                   Set up now
                 </Link>
               </div>
             ) : null}
 
-            <div className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+            <div className="mt-4 inline-flex rounded-md p-[3px]" style={{ backgroundColor: "#F0F0F0" }}>
               <button
                 type="button"
                 onClick={() => setActiveTab("appointments")}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition duration-200 ease-in-out ${
                   activeTab === "appointments"
-                    ? "bg-emerald-600 text-white"
-                    : "text-slate-700 hover:bg-slate-100"
+                    ? "border-b-2 border-[#1A7F5A] bg-white text-[#1A7F5A] shadow-[0_1px_4px_rgba(0,0,0,0.12)]"
+                    : "text-[#5B616E]"
                 }`}
               >
                 Appointments
@@ -760,10 +775,10 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("conversations")}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition duration-200 ease-in-out ${
                   activeTab === "conversations"
-                    ? "bg-emerald-600 text-white"
-                    : "text-slate-700 hover:bg-slate-100"
+                    ? "border-b-2 border-[#1A7F5A] bg-white text-[#1A7F5A] shadow-[0_1px_4px_rgba(0,0,0,0.12)]"
+                    : "text-[#5B616E]"
                 }`}
               >
                 Conversations
@@ -773,29 +788,29 @@ export default function DashboardPage() {
             {activeTab === "appointments" ? (
               <>
                 <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              <section className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+              <section className="stagger-card rounded-xl border px-4 py-4" style={{ background: "linear-gradient(135deg, #F0FDF8, #FFFFFF)", borderColor: "rgba(15,15,15,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", borderLeftWidth: "4px", borderLeftColor: "#1A7F5A" }}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ color: "#5B616E" }}>
                   Confirmed
                 </p>
-                  <p className="mt-1 text-3xl font-bold text-emerald-700">
+                  <p className="mt-1 text-[48px] font-bold leading-none" style={{ color: "#1A1A1A" }}>
                     {allTimeStats.confirmed}
                   </p>
               </section>
 
-              <section className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">
+              <section className="stagger-card rounded-xl border px-4 py-4" style={{ background: "linear-gradient(135deg, #FFF5F5, #FFFFFF)", borderColor: "rgba(15,15,15,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", borderLeftWidth: "4px", borderLeftColor: "#EF4444" }}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ color: "#5B616E" }}>
                   Cancelled
                 </p>
-                  <p className="mt-1 text-3xl font-bold text-rose-700">
+                  <p className="mt-1 text-[48px] font-bold leading-none" style={{ color: "#1A1A1A" }}>
                     {allTimeStats.cancelled}
                   </p>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <section className="stagger-card rounded-xl border px-4 py-4" style={{ background: "linear-gradient(135deg, #FFFBEB, #FFFFFF)", borderColor: "rgba(15,15,15,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", borderLeftWidth: "4px", borderLeftColor: "#F59E0B" }}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ color: "#5B616E" }}>
                   No reply yet
                 </p>
-                  <p className="mt-1 text-3xl font-bold text-slate-700">
+                  <p className="mt-1 text-[48px] font-bold leading-none" style={{ color: "#1A1A1A" }}>
                     {allTimeStats.awaiting}
                   </p>
               </section>
@@ -822,17 +837,28 @@ export default function DashboardPage() {
                           return (
                             <li key={a.id}>
                               <article
-                                className={`rounded-xl border p-3 sm:flex sm:items-start sm:justify-between sm:gap-4 ${cardToneByStatus[a.status]}`}
+                                className={`stagger-card rounded-xl border bg-white p-3 sm:flex sm:items-start sm:justify-between sm:gap-4`}
+                                style={{
+                                  borderColor: "rgba(15,15,15,0.08)",
+                                  boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                                  borderLeftWidth: "3px",
+                                  borderLeftColor:
+                                    a.status === "confirmed"
+                                      ? "#1A7F5A"
+                                      : a.status === "cancelled"
+                                        ? "#EF4444"
+                                        : "#F59E0B",
+                                }}
                               >
                                 <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-slate-900">
+                                  <p className="font-semibold text-[15px]" style={{ color: "#1A1A1A" }}>
                                     {a.client_name}
                                   </p>
-                                  <p className="text-xs text-slate-600">{a.client_phone}</p>
+                                  <p className="text-[13px]" style={{ color: "#5B616E" }}>{a.client_phone}</p>
                                   {a.client_email ? (
-                                    <p className="text-xs text-slate-600">{a.client_email}</p>
+                                    <p className="text-[13px]" style={{ color: "#5B616E" }}>{a.client_email}</p>
                                   ) : null}
-                                  <p className="mt-1 text-sm text-slate-700">
+                                  <p className="mt-1 text-[13px]" style={{ color: "#5B616E" }}>
                                     {formatAppointmentDate(a.appointment_at)}
                                   </p>
                                   <AppointmentTimeRow
@@ -852,7 +878,8 @@ export default function DashboardPage() {
                                         type="button"
                                         onClick={() => void sendReminderNow(a.id)}
                                         disabled={loading || reminderSendingId === a.id}
-                                        className="inline-flex h-9 w-full min-w-[10.5rem] items-center justify-center rounded-lg border border-emerald-500/55 bg-white px-3 text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-50 sm:w-auto"
+                                        className="inline-flex h-9 w-full min-w-[10.5rem] items-center justify-center rounded-lg bg-transparent px-3 text-sm font-medium transition hover:underline disabled:opacity-50 sm:w-auto"
+                                        style={{ color: "#1A7F5A" }}
                                       >
                                         {reminderSendingId === a.id
                                           ? "Sending…"
@@ -875,7 +902,8 @@ export default function DashboardPage() {
                                     type="button"
                                     onClick={() => setPendingDeleteId(a.id)}
                                     disabled={loading}
-                                    className="inline-flex h-9 w-full min-w-[10.5rem] items-center justify-center rounded-lg border border-rose-500/55 bg-white px-3 text-sm font-medium text-rose-800 transition hover:bg-rose-50 disabled:opacity-50 sm:w-auto"
+                                    className="inline-flex h-9 w-full min-w-[10.5rem] items-center justify-center rounded-lg bg-transparent px-3 text-sm font-medium transition hover:underline disabled:opacity-50 sm:w-auto"
+                                    style={{ color: "#EF4444" }}
                                   >
                                     Delete
                                   </button>
@@ -913,7 +941,18 @@ export default function DashboardPage() {
                       return (
                         <article
                           key={conversation.id}
-                          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                          className="stagger-card rounded-xl border bg-white p-4"
+                          style={{
+                            borderColor: "rgba(15,15,15,0.08)",
+                            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                            borderLeftWidth: "3px",
+                            borderLeftColor:
+                              conversation.status === "booked"
+                                ? "#1A7F5A"
+                                : conversation.status === "active"
+                                  ? "#3B82F6"
+                                  : "#9CA3AF",
+                          }}
                         >
                           <button
                             type="button"
@@ -926,7 +965,7 @@ export default function DashboardPage() {
                           >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div>
-                                <p className="text-sm font-semibold text-slate-900">
+                                <p className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
                                   {new Date(conversation.created_at).toLocaleString("en-IE", {
                                     timeZone: "Europe/Dublin",
                                     weekday: "short",
@@ -938,11 +977,11 @@ export default function DashboardPage() {
                                   })}
                                 </p>
                                 {conversation.status === "booked" && client ? (
-                                  <p className="mt-1 text-xs text-slate-600">
+                                  <p className="mt-1 text-xs" style={{ color: "#5B616E" }}>
                                     {client.name || "Client"} {client.email ? `• ${client.email}` : ""}
                                   </p>
                                 ) : null}
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 text-xs" style={{ color: "#5B616E" }}>
                                   {messageCount} {messageCount === 1 ? "message" : "messages"}
                                 </p>
                               </div>
@@ -952,7 +991,7 @@ export default function DashboardPage() {
                                 >
                                   {conversation.status}
                                 </span>
-                                <span className="text-xs font-medium text-slate-500">
+                                <span className="text-xs font-medium" style={{ color: "#5B616E" }}>
                                   {isOpen ? "Hide" : "View"}
                                 </span>
                               </div>
@@ -960,7 +999,7 @@ export default function DashboardPage() {
                           </button>
 
                           {isOpen ? (
-                            <div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="mt-4 space-y-2 rounded-xl border p-3" style={{ borderColor: "rgba(15,15,15,0.10)", backgroundColor: "#F5F5F7" }}>
                               {(conversation.messages ?? []).length === 0 ? (
                                 <p className="text-sm text-slate-500">No transcript available.</p>
                               ) : (
@@ -1006,20 +1045,26 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-30 flex items-end justify-center p-0 sm:items-center sm:p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-900/40"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             aria-label="Close"
             onClick={() => setAddOpen(false)}
           />
           <div
-            className="relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-md sm:rounded-3xl"
+            className="modal-pop relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border bg-white sm:max-w-[480px] sm:rounded-2xl"
+            style={{ borderColor: "rgba(15,15,15,0.08)", boxShadow: "0 24px 48px rgba(0,0,0,0.16)" }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-title"
           >
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 id="add-title" className="text-lg font-semibold text-slate-900">
-                New appointment
-              </h2>
+            <div className="border-b px-5 py-4" style={{ borderColor: "rgba(15,15,15,0.08)" }}>
+              <div className="flex items-center justify-between">
+                <h2 id="add-title" className="text-lg font-semibold" style={{ color: "#1A1A1A" }}>
+                  New Appointment
+                </h2>
+                <button type="button" onClick={() => setAddOpen(false)} className="rounded-md px-2 py-1 text-sm" style={{ color: "#5B616E" }}>
+                  ✕
+                </button>
+              </div>
               <p className="text-sm text-slate-500">
                 We’ll email them before their appointment. Phone is optional.
               </p>
@@ -1033,7 +1078,8 @@ export default function DashboardPage() {
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
+                  className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-[#1A1A1A] outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+                  style={{ backgroundColor: "#F5F5F7" }}
                 />
               </label>
               <label className="block space-y-1.5">
@@ -1045,7 +1091,8 @@ export default function DashboardPage() {
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
                   placeholder="Phone (optional)"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
+                  className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-[#1A1A1A] outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+                  style={{ backgroundColor: "#F5F5F7" }}
                 />
               </label>
               <label className="block space-y-1.5">
@@ -1058,7 +1105,8 @@ export default function DashboardPage() {
                   onChange={(e) => setClientEmail(e.target.value)}
                   placeholder="name@example.com"
                   required
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
+                  className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-[#1A1A1A] outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+                  style={{ backgroundColor: "#F5F5F7" }}
                 />
               </label>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1069,7 +1117,8 @@ export default function DashboardPage() {
                     value={appointmentDate}
                     onChange={(e) => setAppointmentDate(e.target.value)}
                     required
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
+                    className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-[#1A1A1A] outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+                    style={{ backgroundColor: "#F5F5F7" }}
                   />
                 </label>
                 <label className="block space-y-1.5">
@@ -1079,24 +1128,27 @@ export default function DashboardPage() {
                     value={appointmentTime}
                     onChange={(e) => setAppointmentTime(e.target.value)}
                     required
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2"
+                    className="h-11 w-full rounded-[10px] border-2 border-transparent px-3 text-[#1A1A1A] outline-none transition duration-200 ease-in-out focus:border-[#1A7F5A]"
+                    style={{ backgroundColor: "#F5F5F7" }}
                   />
                 </label>
               </div>
-              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setAddOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-60"
+                  className="w-full rounded-[24px] px-4 py-3 text-sm font-semibold text-white transition duration-200 ease-in-out hover:opacity-95 disabled:opacity-60"
+                  style={{ backgroundColor: "#1A7F5A", boxShadow: "0 6px 16px rgba(26,127,90,0.28)" }}
                 >
                   {loading ? "Saving…" : "Save & schedule reminders"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(false)}
+                  className="mt-3 block w-full text-center text-sm"
+                  style={{ color: "#5B616E" }}
+                >
+                  Cancel
                 </button>
               </div>
             </form>
@@ -1144,6 +1196,66 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : null}
+      <style jsx global>{`
+        .stagger-card {
+          opacity: 0;
+          animation: dashboardFade 0.35s ease forwards;
+        }
+        .stagger-card:nth-child(1) {
+          animation-delay: 0ms;
+        }
+        .stagger-card:nth-child(2) {
+          animation-delay: 50ms;
+        }
+        .stagger-card:nth-child(3) {
+          animation-delay: 100ms;
+        }
+        .modal-pop {
+          animation: modalIn 0.2s ease forwards;
+        }
+        @keyframes dashboardFade {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes modalIn {
+          from {
+            opacity: 0;
+            transform: scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .add-appointment-btn {
+          position: relative;
+          overflow: hidden;
+        }
+        .add-appointment-btn::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          transform: translateX(-120%);
+          background: linear-gradient(120deg, transparent 15%, rgba(255, 255, 255, 0.28) 45%, transparent 75%);
+          animation: shimmerMove 2.8s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes shimmerMove {
+          0% {
+            transform: translateX(-120%);
+          }
+          60%,
+          100% {
+            transform: translateX(130%);
+          }
+        }
+      `}</style>
     </div>
   );
 }
