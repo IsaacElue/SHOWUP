@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
@@ -181,6 +182,16 @@ export default function DashboardPage() {
     if (!session) return;
 
     void (async () => {
+      if (!supabase) return;
+      const { data: business } = await supabase
+        .from("businesses")
+        .select("id")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (!business) {
+        router.replace("/onboarding");
+        return;
+      }
       const allowed = await checkDashboardAccess();
       if (allowed) {
         await loadAppointments(session.user.id);
@@ -526,14 +537,22 @@ export default function DashboardPage() {
               <p className="text-xs text-slate-500">Fewer no-shows</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleLogOut}
-            disabled={loading}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-          >
-            {loading ? "Signing out…" : "Sign out"}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/settings"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              Settings
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogOut}
+              disabled={loading}
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              {loading ? "Signing out…" : "Sign out"}
+            </button>
+          </div>
         </div>
       </header>
 

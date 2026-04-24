@@ -24,6 +24,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [checkedSession, setCheckedSession] = useState(false);
 
+  async function redirectAfterAuth(userId: string) {
+    if (!supabase) return;
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    router.replace(business ? "/dashboard" : "/onboarding");
+  }
+
   useEffect(() => {
     if (!supabase) {
       queueMicrotask(() => setCheckedSession(true));
@@ -32,7 +42,7 @@ export default function LoginPage() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        router.replace("/dashboard");
+        void redirectAfterAuth(data.session.user.id);
       } else {
         setCheckedSession(true);
       }
@@ -42,7 +52,7 @@ export default function LoginPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        router.replace("/dashboard");
+        void redirectAfterAuth(session.user.id);
       }
     });
 
@@ -90,13 +100,17 @@ export default function LoginPage() {
     setLoading(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setMessage(friendlyAuthMessage(error.message));
     } else {
       setMessage(null);
-      router.replace("/dashboard");
+      if (data.user?.id) {
+        await redirectAfterAuth(data.user.id);
+      } else {
+        router.replace("/dashboard");
+      }
     }
 
     setLoading(false);
