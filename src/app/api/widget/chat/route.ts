@@ -129,6 +129,56 @@ function parsePendingBookingFromRow(raw: unknown): BookingPayload | null {
   return null;
 }
 
+function getDublinDateFacts(): string {
+  const now = DateTime.now().setZone("Europe/Dublin").setLocale("en");
+
+  const facts: string[] = [];
+  facts.push(`Today is ${now.toFormat("cccc d MMMM yyyy")} (${now.toFormat("yyyy-MM-dd")})`);
+  facts.push(
+    `Tomorrow is ${now.plus({ days: 1 }).toFormat("cccc d MMMM yyyy")} (${now
+      .plus({ days: 1 })
+      .toFormat("yyyy-MM-dd")})`
+  );
+  facts.push(
+    `Day after tomorrow is ${now.plus({ days: 2 }).toFormat("cccc d MMMM yyyy")} (${now
+      .plus({ days: 2 })
+      .toFormat("yyyy-MM-dd")})`
+  );
+
+  for (let i = 1; i <= 14; i += 1) {
+    const d = now.plus({ days: i });
+    facts.push(
+      `In ${i} day${i > 1 ? "s" : ""}: ${d.toFormat("cccc d MMMM yyyy")} (${d.toFormat("yyyy-MM-dd")})`
+    );
+  }
+
+  const weekdays = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+  for (const day of weekdays) {
+    let d = now.plus({ days: 1 });
+    while (d.toFormat("cccc") !== day) {
+      d = d.plus({ days: 1 });
+    }
+    facts.push(
+      `Next ${day} (this coming ${day}): ${d.toFormat("d MMMM yyyy")} (${d.toFormat("yyyy-MM-dd")})`
+    );
+
+    const afterThat = d.plus({ days: 7 });
+    facts.push(
+      `${day} the week after: ${afterThat.toFormat("d MMMM yyyy")} (${afterThat.toFormat("yyyy-MM-dd")})`
+    );
+  }
+
+  return facts.join("\n");
+}
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -448,15 +498,6 @@ export async function POST(req: Request) {
     ? baseConversation
     : [...baseConversation, { role: "user", content: message, ts: new Date().toISOString() }];
 
-  const now = new Date();
-  const todayDublin = now.toLocaleDateString("en-IE", {
-    timeZone: "Europe/Dublin",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
   const pendingFromDb = parsePendingBookingFromRow(
     (conversationRow as { pending_booking?: unknown } | null)?.pending_booking
   );
@@ -543,69 +584,25 @@ export async function POST(req: Request) {
     "Your goal is to help website visitors book appointments for this business.",
     "Never invent details. Only use provided business data.",
     "If details are missing, ask for one missing item at a time.",
-    `DATE CALCULATION — CRITICAL RULES:
+    `DATE REFERENCE — USE THESE EXACT DATES:
+These are pre-calculated facts. Use ONLY these
+dates. Never calculate dates yourself.
 
-Today is ${todayDublin}.
-Current timezone: Europe/Dublin.
+${getDublinDateFacts()}
 
-BEFORE stating any date to the client, you MUST
-internally verify the day of week matches the
-date. Use this logic:
+When a client says a date expression, look it
+up in the reference above and use that exact
+YYYY-MM-DD. Never guess or calculate yourself.
 
-Known reference: Today is ${todayDublin}.
-Count forward from today to find exact dates.
+If client says "next Tuesday" — find
+"Next Tuesday (this coming Tuesday)" in the
+reference above and use that date.
 
-RELATIVE DATE RULES:
-- 'today' = today
-- 'tomorrow' = today + 1 day
-- 'day after tomorrow' = today + 2 days
-- 'in X days' = today + X days
-- 'this [weekday]' = the next occurrence of
-  that weekday at or after today
-- '[weekday]' with no qualifier = next occurrence
-  of that weekday from today
-- 'next [weekday]' = the occurrence AFTER the
-  coming one, at least 7 days away
-- 'next week' = 7 days from today
-- '2 weeks from now' = 14 days from today
+If client says "Tuesday next week" — find
+"Tuesday the week after" in the reference above.
 
-VERIFICATION — ALWAYS DO THIS:
-After calculating a date:
-1. Count the days from today to that date
-2. Determine what day of week it falls on
-3. If it does not match what the client said,
-   correct yourself silently and recalculate
-4. Only confirm the date to the client after
-   this verification passes
-
-WHEN CLIENT SAYS A DAY NAME:
-- Client says 'Tuesday' — find the next Tuesday
-  from today by counting forward
-- Today is Friday 24 April 2026
-- Saturday = 25 April, Sunday = 26, Monday = 27,
-  Tuesday = 28 April 2026
-- So 'this Tuesday' or 'Tuesday' = 28 April 2026
-- 'Next Tuesday' = 5 May 2026
-
-SPECIFIC DATES FROM CLIENT:
-- If client says '29th April' — look up what day
-  that is: 29 April 2026 is a Wednesday
-- Always state the correct day: 'Wednesday 29 April'
-- Never say 'Tuesday 29 April' if 29 April is
-  a Wednesday
-
-CONFIRMATION BEFORE ACCEPTING:
-When you have a date, always confirm with client:
-'Just to confirm — you want [correct weekday]
-[date] at [time]?'
-Wait for yes before proceeding to collect name/email.
-
-NEVER output appointmentDate where the weekday
-does not match. The server will reject it and
-the client will see an error.
-
-Output appointmentDate as YYYY-MM-DD and
-appointmentTime as HH:MM in Europe/Dublin time.`,
+Always confirm the full date back to the client
+before asking for their name.`,
     "NEVER treat a booking as final until the user explicitly approves a recap. Do not imply the appointment is booked until then.",
     "When you have collected client name, client email, service, date (YYYY-MM-DD), and time (HH:MM), first enter confirmation state:",
     'In your reply text, ask clearly: "Just to confirm your booking:" then list Name, Service, Date (weekday + YYYY-MM-DD) at time, then ask: "Shall I confirm this? Reply Yes to book or No to change anything."',
