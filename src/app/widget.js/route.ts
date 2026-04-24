@@ -1,6 +1,5 @@
 const widgetScript = `(() => {
-  if (window.__showupWidgetLoaded) return;
-  window.__showupWidgetLoaded = true;
+  if (!window.__showupWidgetInstances) window.__showupWidgetInstances = {};
   var BRAND = "#1A7F5A";
   var scriptEl = document.currentScript;
   var widgetKey = scriptEl ? (scriptEl.getAttribute("data-key") || "").trim() : "";
@@ -8,6 +7,8 @@ const widgetScript = `(() => {
     console.error("ShowUp widget: missing data-key");
     return;
   }
+  if (window.__showupWidgetInstances[widgetKey]) return;
+  window.__showupWidgetInstances[widgetKey] = true;
 
   var apiBase;
   try {
@@ -89,6 +90,7 @@ const widgetScript = `(() => {
   var formEl = panel.querySelector(".showup-input-wrap");
   var inputEl = panel.querySelector(".showup-input");
   var sendBtn = panel.querySelector(".showup-send");
+  var listenersAttached = false;
 
   function persistState() {
     localStorage.setItem(storageKey, JSON.stringify(messages));
@@ -183,11 +185,14 @@ const widgetScript = `(() => {
     }
   }
 
-  fab.addEventListener("click", function () { togglePanel(); });
-  if (closeBtn) closeBtn.addEventListener("click", function () { togglePanel(false); });
-  if (resetBtn) resetBtn.addEventListener("click", resetConversation);
-  if (formEl) formEl.addEventListener("submit", handleSubmit);
-  if (inputEl) inputEl.addEventListener("keydown", function (e) { if (e.key === "Escape") togglePanel(false); });
+  if (!listenersAttached) {
+    listenersAttached = true;
+    fab.addEventListener("click", function () { togglePanel(); });
+    if (closeBtn) closeBtn.addEventListener("click", function () { togglePanel(false); });
+    if (resetBtn) resetBtn.addEventListener("click", resetConversation);
+    if (formEl) formEl.addEventListener("submit", handleSubmit);
+    if (inputEl) inputEl.addEventListener("keydown", function (e) { if (e.key === "Escape") togglePanel(false); });
+  }
 
   host.appendChild(fab);
   host.appendChild(tooltip);

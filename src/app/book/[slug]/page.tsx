@@ -32,6 +32,14 @@ const DAYS: Array<{ key: keyof WeeklyHours; label: string }> = [
   { key: "sun", label: "Sunday" },
 ];
 
+function formatEuroPrice(value: number) {
+  const isWhole = Number.isInteger(value);
+  return `€${value.toLocaleString("en-IE", {
+    minimumFractionDigits: isWhole ? 0 : 2,
+    maximumFractionDigits: isWhole ? 0 : 2,
+  })}`;
+}
+
 export default async function PublicBookingPage({
   params,
 }: {
@@ -111,7 +119,7 @@ export default async function PublicBookingPage({
                     <p className="text-xs text-slate-600">{service.duration_minutes} min</p>
                   </div>
                   <p className="font-semibold text-slate-900">
-                    {service.currency} {Number(service.price).toFixed(2)}
+                    {formatEuroPrice(Number(service.price))}
                   </p>
                 </li>
               ))}
