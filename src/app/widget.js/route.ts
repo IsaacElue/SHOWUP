@@ -32,7 +32,6 @@ const widgetScript = `(() => {
   var uuidLikeKey = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedBusinessName);
   var businessName = storedBusinessName && !uuidLikeKey ? storedBusinessName : "ShowUp";
   var isOpen = localStorage.getItem(openStorageKey) === "1";
-  var isSending = false;
   var messages = [];
   try {
     var existing = localStorage.getItem(storageKey);
@@ -91,6 +90,8 @@ const widgetScript = `(() => {
   var inputEl = panel.querySelector(".showup-input");
   var sendBtn = panel.querySelector(".showup-send");
   var listenersAttached = false;
+  var lastSubmitAt = 0;
+  if (sendBtn) sendBtn.dataset.sending = "false";
 
   function persistState() {
     localStorage.setItem(storageKey, JSON.stringify(messages));
@@ -152,16 +153,18 @@ const widgetScript = `(() => {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!inputEl || isSending) return;
-    isSending = true;
-    if (sendBtn) sendBtn.disabled = true;
+    if (!inputEl || !sendBtn) return;
+    if (sendBtn.dataset.sending === "true") return;
+    sendBtn.dataset.sending = "true";
+    sendBtn.disabled = true;
     var text = inputEl.value.trim();
     if (!text) {
-      isSending = false;
-      if (sendBtn) sendBtn.disabled = false;
+      sendBtn.dataset.sending = "false";
+      sendBtn.disabled = false;
       return;
     }
 
+    lastSubmitAt = Date.now();
     inputEl.value = "";
     messages.push({ role: "user", content: text, ts: Date.now() });
     renderMessages();
@@ -178,8 +181,8 @@ const widgetScript = `(() => {
     } catch (_err) {
       messages.push({ role: "assistant", content: "Sorry, I could not connect just now. Please try again in a moment.", ts: Date.now() });
     } finally {
-      isSending = false;
-      if (sendBtn) sendBtn.disabled = false;
+      sendBtn.dataset.sending = "false";
+      sendBtn.disabled = false;
       renderMessages();
       persistState();
     }
@@ -191,7 +194,20 @@ const widgetScript = `(() => {
     if (closeBtn) closeBtn.addEventListener("click", function () { togglePanel(false); });
     if (resetBtn) resetBtn.addEventListener("click", resetConversation);
     if (formEl) formEl.addEventListener("submit", handleSubmit);
-    if (inputEl) inputEl.addEventListener("keydown", function (e) { if (e.key === "Escape") togglePanel(false); });
+    if (inputEl) {
+      inputEl.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          togglePanel(false);
+          return;
+        }
+        if (e.key === "Enter") {
+          var now = Date.now();
+          if (now - lastSubmitAt < 500) {
+            e.preventDefault();
+          }
+        }
+      });
+    }
   }
 
   host.appendChild(fab);
